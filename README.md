@@ -72,12 +72,26 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# 4. 启动服务
+# 4. 启动服务（本地访问）
 python app.py
-
-# 5. 打开浏览器
 # → http://127.0.0.1:8080
 ```
+
+### 🌐 公网访问（无需公网 IP）
+
+使用 Cloudflare Tunnel 免费内网穿透，任何设备都能访问：
+
+```bash
+# 安装 cloudflared
+brew install cloudflared
+
+# 一键启动（Flask + 公网隧道）
+./start_public.sh
+```
+
+启动后会输出类似 `https://xxx.trycloudflare.com` 的公网地址，在手机、平板、其他电脑上打开即可使用。
+
+> **注意**：免费隧道每次重启 URL 会变化。如需固定域名，可注册 Cloudflare 账号并创建命名隧道。
 
 首次运行时，Whisper 会自动下载 `small` 模型（约 464MB），之后即可离线使用。
 
