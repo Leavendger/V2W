@@ -38,15 +38,17 @@ def transcribe(audio_path, model_size='medium', device='auto', compute_type='aut
 
     logger.info(f'Transcribing: {audio_path}')
 
-    # faster-whisper 转写
+    # faster-whisper 转写（速度优先参数）
     segments, info = model.transcribe(
         audio_path,
         language=language,
-        beam_size=5,
-        vad_filter=True,           # 过滤静音段
+        beam_size=1,               # 贪婪搜索，最快
+        best_of=1,                 # 单候选
+        vad_filter=True,           # 过滤静音（跳过无效计算）
         vad_parameters=dict(
-            min_silence_duration_ms=500,  # 最小静音间隔 0.5 秒
+            min_silence_duration_ms=500,
         ),
+        condition_on_previous_text=False,  # 减少上下文依赖
     )
 
     logger.info(f'Detected language: {info.language} (probability={info.language_probability:.2f})')
