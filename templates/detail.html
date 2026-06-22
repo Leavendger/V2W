@@ -5,7 +5,25 @@
 {% block content %}
 <a href="/" class="back-link">← 返回文件列表</a>
 
-<div class="detail-container">
+<!-- 音频文件：播放器固定在顶部 -->
+{% if file.status == 'completed' and file.file_type == 'audio' %}
+<div class="audio-sticky-bar" id="audio-sticky-bar">
+    <div class="audio-sticky-inner">
+        <span class="audio-sticky-icon">🎵</span>
+        <div class="audio-sticky-info">
+            <span class="audio-sticky-name">{{ file.filename }}</span>
+            <span class="audio-sticky-time">
+                {{ format_size(file.file_size) }}
+                {% if file.duration %} · {{ (file.duration|int) // 60 }}:{{ '%02d' % ((file.duration|int) % 60) }}{% endif %}
+            </span>
+        </div>
+        <audio id="player" controls src="{{ url_for('uploaded_file', filename=file.stored_path) }}"
+               preload="metadata"></audio>
+    </div>
+</div>
+{% endif %}
+
+<div class="detail-container {% if file.file_type == 'video' %}detail-video-layout{% endif %}">
     <!-- 文件信息头 -->
     <div class="detail-header">
         <div class="detail-header-left">
@@ -27,38 +45,35 @@
         <span class="status-badge status-{{ file.status }}">{{ file.status_label }}</span>
     </div>
 
-    <!-- 播放器区域 -->
+    <!-- 非音频的播放器区域（音频已移到 sticky bar） -->
+    {% if file.file_type != 'audio' or file.status != 'completed' %}
     <div class="player-area" id="player-area">
-        {% if file.status == 'completed' and file.file_type in ('audio', 'video') %}
-            {% if file.file_type == 'video' %}
-            <video id="player" controls src="{{ url_for('uploaded_file', filename=file.stored_path) }}"
-                   preload="metadata"></video>
-            {% else %}
-            <audio id="player" controls src="{{ url_for('uploaded_file', filename=file.stored_path) }}"
-                   preload="metadata"></audio>
-            {% endif %}
+        {% if file.status == 'completed' and file.file_type == 'video' %}
+        <video id="player" controls src="{{ url_for('uploaded_file', filename=file.stored_path) }}"
+               preload="metadata"></video>
         {% elif file.status == 'processing' %}
-            <div class="player-placeholder processing-state">
-                <div class="spinner"></div>
-                <p>正在转写中，完成后即可播放&hellip;</p>
-            </div>
+        <div class="player-placeholder processing-state">
+            <div class="spinner"></div>
+            <p>正在转写中，完成后即可播放&hellip;</p>
+        </div>
         {% elif file.status == 'uploaded' %}
-            <div class="player-placeholder">
-                <p>🟡 排队等待转写中，稍后即可播放</p>
-            </div>
+        <div class="player-placeholder">
+            <p>🟡 排队等待转写中，稍后即可播放</p>
+        </div>
         {% elif file.status == 'failed' %}
-            <div class="player-placeholder error-state">
-                <p>🔴 转写失败</p>
-                {% if file.error_message %}
-                <p class="error-detail">{{ file.error_message }}</p>
-                {% endif %}
-            </div>
+        <div class="player-placeholder error-state">
+            <p>🔴 转写失败</p>
+            {% if file.error_message %}
+            <p class="error-detail">{{ file.error_message }}</p>
+            {% endif %}
+        </div>
         {% else %}
-            <div class="player-placeholder">
-                <p>暂不可用</p>
-            </div>
+        <div class="player-placeholder">
+            <p>暂不可用</p>
+        </div>
         {% endif %}
     </div>
+    {% endif %}
 
     <!-- 转写文字区 -->
     <div class="transcript-section" id="transcript-section">
@@ -106,6 +121,7 @@
     var player = document.getElementById('player');
     var items = document.querySelectorAll('.segment-item');
     var status = '{{ file.status }}';
+    var fileType = '{{ file.file_type }}';
 
     // ============================================================
     // 状态轮询（处理中→完成时刷新页面）
@@ -158,14 +174,9 @@
         }
 
         if (found !== currentActive) {
-            // 移除旧高亮
-            if (currentActive) {
-                currentActive.classList.remove('active');
-            }
-            // 添加新高亮
+            if (currentActive) currentActive.classList.remove('active');
             if (found) {
                 found.classList.add('active');
-                // 滚动到可见区域
                 found.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
             currentActive = found;
@@ -177,16 +188,16 @@
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
         switch (e.key) {
-            case ' ':  // 空格：播放/暂停
+            case ' ':
                 e.preventDefault();
                 if (player.paused) player.play();
                 else player.pause();
                 break;
-            case 'ArrowLeft':  // ← 后退 5 秒
+            case 'ArrowLeft':
                 e.preventDefault();
                 player.currentTime = Math.max(0, player.currentTime - 5);
                 break;
-            case 'ArrowRight':  // → 前进 5 秒
+            case 'ArrowRight':
                 e.preventDefault();
                 player.currentTime = Math.min(player.duration, player.currentTime + 5);
                 break;

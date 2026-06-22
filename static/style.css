@@ -440,6 +440,56 @@ button { cursor: pointer; font-family: inherit; }
 
 .back-link:hover { opacity: 0.7; }
 
+/* ---- 音频固定条 ---- */
+.audio-sticky-bar {
+    position: sticky;
+    top: 60px;              /* 导航栏高度 */
+    z-index: 50;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    padding: 10px 28px;
+    margin: -36px -28px 20px -28px;  /* 撑满 main-container 宽度，并贴顶 */
+}
+
+.audio-sticky-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.audio-sticky-icon { font-size: 28px; flex-shrink: 0; }
+
+.audio-sticky-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.audio-sticky-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.audio-sticky-time {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.audio-sticky-inner audio {
+    flex-shrink: 0;
+    width: 320px;
+    height: 36px;
+}
+
 /* 详情头部 */
 .detail-header {
     display: flex;
@@ -476,6 +526,34 @@ button { cursor: pointer; font-family: inherit; }
     display: inline-flex;
     align-items: center;
     gap: 4px;
+}
+
+/* ---- 视频：左右分栏布局 ---- */
+.detail-video-layout {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.detail-video-layout .detail-header {
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.detail-video-layout .player-area {
+    flex: 1 1 55%;
+    min-width: 400px;
+    margin-bottom: 0;
+    align-self: flex-start;
+    position: sticky;
+    top: 80px;
+}
+
+.detail-video-layout .transcript-section {
+    flex: 1 1 40%;
+    min-width: 320px;
+    border-top: none;
+    padding-top: 0;
 }
 
 /* 播放器 */
@@ -665,6 +743,28 @@ button { cursor: pointer; font-family: inherit; }
     .segment-text  { font-size: 14px; }
 
     .shortcuts-hint { gap: 8px; }
+
+    /* 响应式：视频左右布局变上下堆叠 */
+    .detail-video-layout {
+        flex-direction: column;
+        gap: 16px;
+    }
+    .detail-video-layout .player-area {
+        min-width: unset;
+        position: static;
+    }
+    .detail-video-layout .transcript-section {
+        min-width: unset;
+    }
+
+    /* 响应式：音频固定条 */
+    .audio-sticky-bar {
+        padding: 10px 16px;
+        top: 56px;
+    }
+    .audio-sticky-inner { gap: 10px; }
+    .audio-sticky-inner audio { width: 200px; }
+    .audio-sticky-name { font-size: 13px; }
 }
 
 @media (max-width: 480px) {
