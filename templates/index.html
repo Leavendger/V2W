@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}V2W — 首页{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>上传音视频，自动转文字</h1>
+    <p>支持 mp4 / mov / mp3 / wav 等常见格式，本地处理，隐私安全</p>
+</div>
+
+<div class="files-section">
+    <div class="files-header">
+        <h2>我的文件</h2>
+    </div>
+    <div class="files-grid">
+        <div class="empty-state">
+            <p>📂 还没有上传文件</p>
+            <p>开始上传你的第一个会议录音吧</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

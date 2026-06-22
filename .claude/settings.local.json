@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -sL \"https://github.com/cli/cli/releases/latest/download/gh_2.75.0_macOS_arm64.tar.gz\" -o /tmp/gh.tar.gz)",
+      "Bash(tar -xzf /tmp/gh.tar.gz -C /tmp)",
+      "Bash(mkdir -p /opt/homebrew/bin)",
+      "Bash(sudo cp /tmp/gh_*/bin/gh /usr/local/bin/gh)",
+      "Bash(cp /tmp/gh_*/bin/gh /tmp/gh)",
+      "Bash(ffmpeg -version)",
+      "Bash(pip3 install *)",
+      "Bash(kill %1)"
+    ]
+  }
+}

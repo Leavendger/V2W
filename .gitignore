@@ -1,0 +1,21 @@
+# 虚拟环境
+venv/
+
+# 上传文件
+uploads/
+
+# 数据库
+instance/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# 系统文件
+.DS_Store
+Thumbs.db

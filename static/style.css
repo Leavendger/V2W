@@ -1,0 +1,88 @@
+/* V2W — 基础样式（P5 阶段会完善） */
+:root {
+    --bg-page: #f0f6fc;
+    --bg-card: #ffffff;
+    --primary: #1976d2;
+    --text-primary: #212121;
+    --text-secondary: #757575;
+    --border: #e0e0e0;
+    --radius: 8px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.navbar {
+    background: var(--bg-card);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    padding: 0 24px;
+}
+
+.nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    height: 56px;
+    display: flex;
+    align-items: center;
+}
+
+.nav-brand {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.main-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+.hero {
+    text-align: center;
+    padding: 40px 0;
+}
+
+.hero h1 {
+    font-size: 28px;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.hero p {
+    color: var(--text-secondary);
+    font-size: 16px;
+}
+
+.files-section {
+    margin-top: 24px;
+}
+
+.files-header h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+}
+
+.empty-state p:first-child {
+    font-size: 48px;
+    margin-bottom: 8px;
+}
