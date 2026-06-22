@@ -47,7 +47,7 @@
         <div class="empty-state">
             <div class="empty-icon">📂</div>
             <h2>还没有上传文件</h2>
-            <p>支持 mp4 / mov / mp3 / wav 等常见格式<br>本地处理，隐私安全</p>
+            <p>拖拽文件到页面任意位置，或点击下方按钮上传<br>支持 mp4 / mov / mp3 / wav 等常见格式</p>
             <label for="upload-input" class="upload-btn upload-btn-hero">+ 上传第一个文件</label>
         </div>
     {% endif %}
@@ -62,50 +62,134 @@
 
 {% block scripts %}
 <script>
-// 上传后自动提交
-document.getElementById('upload-input').addEventListener('change', function() {
-    if (this.files.length > 0) {
-        document.getElementById('upload-form').submit();
-    }
-});
-
-// 轮询：检查是否有处理中的文件，有则定时刷新
 (function() {
-    var pendingIds = [
-        {% for file in files %}
-        {% if file.status in ('uploaded', 'processing') %}
-        {{ file.id }},
-        {% endif %}
-        {% endfor %}
-    ];
+    var uploadForm = document.getElementById('upload-form');
+    var uploadInput = document.getElementById('upload-input');
+    var dropOverlay = document.getElementById('drop-overlay');
+    var mainContainer = document.getElementById('main-container');
+    var dragCounter = 0;  // 处理子元素 dragenter/leave 冒泡
 
-    if (pendingIds.length === 0) return;
+    // ============================================================
+    // 点击上传
+    // ============================================================
+    uploadInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            uploadForm.submit();
+        }
+    });
 
-    var pollCount = 0;
-    var maxPolls = 300; // 最多轮询 300 次（约 15 分钟）
-
-    function poll() {
-        if (pollCount >= maxPolls) return;
-        pollCount++;
-
-        // 查询第一个待处理文件的状态
-        fetch('/api/file/' + pendingIds[0] + '/status')
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.status === 'completed' || data.status === 'failed') {
-                    // 状态已变化，刷新页面
-                    location.reload();
-                } else {
-                    // 继续轮询
-                    setTimeout(poll, 3000);
-                }
-            })
-            .catch(function() {
-                setTimeout(poll, 3000);
-            });
+    // ============================================================
+    // 拖拽上传
+    // ============================================================
+    function showOverlay() {
+        dropOverlay.classList.add('active');
+        mainContainer.classList.add('drop-active');
     }
 
-    setTimeout(poll, 2000); // 首次 2 秒后开始
+    function hideOverlay() {
+        dropOverlay.classList.remove('active');
+        mainContainer.classList.remove('drop-active');
+    }
+
+    // 阻止默认行为（必须，否则浏览器会直接打开文件）
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(evt) {
+        document.addEventListener(evt, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false);
+    });
+
+    // dragenter：文件进入页面时显示遮罩
+    document.addEventListener('dragenter', function(e) {
+        dragCounter++;
+        if (e.dataTransfer.types && e.dataTransfer.types.indexOf('Files') !== -1) {
+            showOverlay();
+        }
+    });
+
+    // dragover：持续触发，保持遮罩
+    document.addEventListener('dragover', function(e) {
+        if (e.dataTransfer.types && e.dataTransfer.types.indexOf('Files') !== -1) {
+            showOverlay();
+        }
+    });
+
+    // dragleave：文件离开页面时隐藏
+    document.addEventListener('dragleave', function(e) {
+        dragCounter--;
+        if (dragCounter <= 0) {
+            dragCounter = 0;
+            hideOverlay();
+        }
+    });
+
+    // drop：接收文件并上传
+    document.addEventListener('drop', function(e) {
+        dragCounter = 0;
+        hideOverlay();
+
+        var files = e.dataTransfer.files;
+        if (files.length === 0) return;
+
+        // 只取第一个文件（当前 MVP 单文件上传）
+        var file = files[0];
+
+        // 客户端快速格式校验
+        var allowedExts = ['.mp3','.wav','.m4a','.flac','.aac','.ogg','.wma',
+                           '.mp4','.mov','.avi','.wmv','.webm','.mkv','.flv'];
+        var fileName = file.name.toLowerCase();
+        var ext = '.' + fileName.split('.').pop();
+        var isValid = allowedExts.indexOf(ext) !== -1;
+
+        if (!isValid) {
+            alert('不支持的格式「' + file.name + '」\n\n支持：mp3, wav, m4a, flac, mp4, mov, avi, webm 等');
+            return;
+        }
+
+        // 填入文件并提交表单
+        var dt = new DataTransfer();
+        dt.items.add(file);
+        uploadInput.files = dt.files;
+        uploadForm.submit();
+    });
+
+    // ============================================================
+    // 轮询：检查是否有处理中的文件，有则定时刷新
+    // ============================================================
+    (function() {
+        var pendingIds = [
+            {% for file in files %}
+            {% if file.status in ('uploaded', 'processing') %}
+            {{ file.id }},
+            {% endif %}
+            {% endfor %}
+        ];
+
+        if (pendingIds.length === 0) return;
+
+        var pollCount = 0;
+        var maxPolls = 300;
+
+        function poll() {
+            if (pollCount >= maxPolls) return;
+            pollCount++;
+
+            fetch('/api/file/' + pendingIds[0] + '/status')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        location.reload();
+                    } else {
+                        setTimeout(poll, 3000);
+                    }
+                })
+                .catch(function() {
+                    setTimeout(poll, 3000);
+                });
+        }
+
+        setTimeout(poll, 2000);
+    })();
 })();
 </script>
 {% endblock %}

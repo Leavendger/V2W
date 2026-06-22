@@ -25,9 +25,18 @@
         {% endif %}
     {% endwith %}
 
-    <main class="main-container">
+    <main class="main-container" id="main-container">
         {% block content %}{% endblock %}
     </main>
+
+    <!-- 拖拽上传遮罩（全局） -->
+    <div class="drop-overlay" id="drop-overlay">
+        <div class="drop-overlay-content">
+            <span class="drop-icon">📂</span>
+            <p>释放文件以上传</p>
+            <p class="drop-hint">支持 mp3 / mp4 / wav / mov 等音视频格式</p>
+        </div>
+    </div>
 
     {% block scripts %}{% endblock %}
 </body>

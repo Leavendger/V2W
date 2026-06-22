@@ -117,6 +117,64 @@ button { cursor: pointer; font-family: inherit; }
     to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ---- 拖拽上传遮罩 ---- */
+.drop-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(25, 118, 210, 0.92);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.drop-overlay.active {
+    display: flex;
+    animation: fadeIn 0.15s ease;
+}
+
+.drop-overlay-content {
+    text-align: center;
+    color: #fff;
+    pointer-events: none;
+}
+
+.drop-icon {
+    font-size: 72px;
+    display: block;
+    margin-bottom: 16px;
+    animation: dropBounce 1s ease-in-out infinite;
+}
+
+.drop-overlay-content p {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.drop-hint {
+    font-size: 14px !important;
+    font-weight: 400 !important;
+    opacity: 0.85;
+}
+
+/* 拖拽时主页面轻微缩放提示 */
+.main-container.drop-active {
+    transition: transform 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes dropBounce {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
+}
+
 /* ---- 主容器 ---- */
 .main-container {
     max-width: 1200px;
