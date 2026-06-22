@@ -3,20 +3,70 @@
 {% block title %}V2W — 首页{% endblock %}
 
 {% block content %}
-<div class="hero">
-    <h1>上传音视频，自动转文字</h1>
-    <p>支持 mp4 / mov / mp3 / wav 等常见格式，本地处理，隐私安全</p>
+<div class="page-header">
+    <div class="header-left">
+        <h1>我的文件</h1>
+        <span class="file-count">{{ files|length }} 个文件</span>
+    </div>
+    <div class="header-right">
+        <label for="upload-input" class="upload-btn">+ 上传文件</label>
+    </div>
 </div>
 
-<div class="files-section">
-    <div class="files-header">
-        <h2>我的文件</h2>
-    </div>
-    <div class="files-grid">
+<div class="files-grid">
+    {% if files %}
+        {% for file in files %}
+        <a href="{{ url_for('file_detail', file_id=file.id) }}" class="file-card">
+            <div class="file-card-icon">{{ file_emoji(file.file_type) }}</div>
+            <div class="file-card-name" title="{{ file.filename }}">{{ file.filename }}</div>
+            <div class="file-card-meta">
+                <span>{{ format_size(file.file_size) }}</span>
+                {% if file.duration %}
+                <span> · </span>
+                <span>{% set dur = file.duration|int %}{{ dur // 60 }}:{{ '%02d' % (dur % 60) }}</span>
+                {% endif %}
+            </div>
+            <div class="file-card-status">
+                <span class="status-badge status-{{ file.status }}">{{ file.status_label }}</span>
+            </div>
+            <form action="{{ url_for('delete_file', file_id=file.id) }}" method="POST"
+                  class="file-card-delete"
+                  onclick="event.stopPropagation()"
+                  onsubmit="return confirm('确定删除「{{ file.filename }}」吗？此操作不可撤销。')">
+                <button type="submit" class="delete-btn" title="删除">✕</button>
+            </form>
+        </a>
+        {% endfor %}
+
+        <!-- 上传说卡片（跟在文件后面） -->
+        <label for="upload-input" class="file-card file-card-upload">
+            <div class="upload-placeholder">+<br><span>上传新文件</span></div>
+        </label>
+    {% else %}
+        <!-- 空状态 -->
         <div class="empty-state">
-            <p>📂 还没有上传文件</p>
-            <p>开始上传你的第一个会议录音吧</p>
+            <div class="empty-icon">📂</div>
+            <h2>还没有上传文件</h2>
+            <p>支持 mp4 / mov / mp3 / wav 等常见格式<br>本地处理，隐私安全</p>
+            <label for="upload-input" class="upload-btn upload-btn-hero">+ 上传第一个文件</label>
         </div>
-    </div>
+    {% endif %}
 </div>
+
+<!-- 隐藏的上传 input，由 label 触发 -->
+<form id="upload-form" action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data">
+    <input id="upload-input" type="file" name="file" accept=".mp4,.mov,.avi,.wmv,.webm,.mkv,.flv,.mp3,.wav,.m4a,.flac,.aac,.ogg,.wma"
+           onchange="this.form.submit()" hidden>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 上传后自动提交
+document.getElementById('upload-input').addEventListener('change', function() {
+    if (this.files.length > 0) {
+        document.getElementById('upload-form').submit();
+    }
+});
+</script>
 {% endblock %}

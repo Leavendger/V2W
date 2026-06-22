@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}{{ file.filename }} — V2W{% endblock %}
+
+{% block content %}
+<a href="/" class="back-link">← 返回文件列表</a>
+
+<div class="detail-container">
+    <div class="page-header" style="margin-bottom:20px">
+        <div class="header-left">
+            <h1>{{ file_emoji(file.file_type) }} {{ file.filename }}</h1>
+        </div>
+        <span class="status-badge status-{{ file.status }}">{{ file.status_label }}</span>
+    </div>
+
+    <div class="player-area">
+        {% if file.status == 'completed' %}
+            {% if file.file_type == 'video' %}
+            <video controls src="{{ url_for('uploaded_file', filename=file.stored_path) }}"></video>
+            {% else %}
+            <audio controls src="{{ url_for('uploaded_file', filename=file.stored_path) }}"></audio>
+            {% endif %}
+        {% else %}
+            <div class="no-player">
+                <p>{% if file.status == 'processing' %}🔵 正在转写中，完成后即可播放{% elif file.status == 'uploaded' %}🟡 等待转写中{% else %}🔴 转写失败{% endif %}</p>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if segments %}
+    <div class="segments-list">
+        {% for seg in segments %}
+        <div class="segment-item" data-start="{{ seg.start_time }}">
+            <span class="segment-time">{{ seg.formatted_time }}</span>
+            <span class="segment-text">{{ seg.text }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="text-align:center;color:var(--text-secondary);padding:40px">
+        {% if file.status == 'completed' %}
+        转写完成，暂无文字内容
+        {% elif file.status == 'failed' %}
+        转写失败：{{ file.error_message or '未知错误' }}
+        {% else %}
+        正在等待转写&hellip;
+        {% endif %}
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

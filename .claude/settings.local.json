@@ -8,7 +8,10 @@
       "Bash(cp /tmp/gh_*/bin/gh /tmp/gh)",
       "Bash(ffmpeg -version)",
       "Bash(pip3 install *)",
-      "Bash(kill %1)"
+      "Bash(kill %1)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git add *)"
     ]
   }
 }
