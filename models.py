@@ -17,7 +17,8 @@ class File(db.Model):
     status = db.Column(db.String(32), default='uploaded')    # uploaded / processing / completed / failed
     duration = db.Column(db.Float, nullable=True)            # 秒，转写完填充
     error_message = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)       # 上传完成时间
+    transcribed_at = db.Column(db.DateTime, nullable=True)             # 转写完成时间
 
     # 关联
     segments = db.relationship(
@@ -38,7 +39,22 @@ class File(db.Model):
             'duration': self.duration,
             'error_message': self.error_message,
             'created_at': self.created_at.isoformat() if self.created_at else None,
+            'transcribed_at': self.transcribed_at.isoformat() if self.transcribed_at else None,
         }
+
+    @property
+    def formatted_created_at(self):
+        """上传时间格式化"""
+        if not self.created_at:
+            return '-'
+        return self.created_at.strftime('%m-%d %H:%M')
+
+    @property
+    def formatted_transcribed_at(self):
+        """转写完成时间格式化"""
+        if not self.transcribed_at:
+            return '-'
+        return self.transcribed_at.strftime('%m-%d %H:%M')
 
     @property
     def status_label(self):

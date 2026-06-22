@@ -12,9 +12,16 @@
             <span class="detail-icon">{{ file_emoji(file.file_type) }}</span>
             <div>
                 <h1 class="detail-title">{{ file.filename }}</h1>
-                <span class="detail-meta">{{ format_size(file.file_size) }}
+                <span class="detail-meta">
+                    {{ format_size(file.file_size) }}
                     {% if file.duration %} · {{ (file.duration|int) // 60 }}:{{ '%02d' % ((file.duration|int) % 60) }}{% endif %}
                 </span>
+                <div class="detail-times">
+                    <span class="time-item">📤 上传 {{ file.formatted_created_at }}</span>
+                    {% if file.transcribed_at %}
+                    <span class="time-item">✅ 转写完成 {{ file.formatted_transcribed_at }}</span>
+                    {% endif %}
+                </div>
             </div>
         </div>
         <span class="status-badge status-{{ file.status }}">{{ file.status_label }}</span>

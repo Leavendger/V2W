@@ -120,6 +120,8 @@ def create_app():
             'error_message': file_record.error_message,
             'duration': file_record.duration,
             'segment_count': file_record.segments.count(),
+            'created_at': file_record.formatted_created_at,
+            'transcribed_at': file_record.formatted_transcribed_at,
         })
 
     # ============================================================

@@ -4,6 +4,7 @@ import time
 import subprocess
 import threading
 import logging
+from datetime import datetime
 from queue import Queue
 from sqlalchemy.exc import OperationalError
 
@@ -141,6 +142,7 @@ def _worker_loop(app):
 
                 # 5. 更新文件信息
                 file_record.status = 'completed'
+                file_record.transcribed_at = datetime.utcnow()
                 if segments:
                     file_record.duration = segments[-1]['end']
                 _db_commit_with_retry(db.session)
