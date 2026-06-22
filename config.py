@@ -10,6 +10,24 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(BASE_DIR, 'instance', 'v2w.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'connect_args': {
+            'timeout': 30,           # 等待锁的超时（秒）
+        },
+        'pool_pre_ping': True,
+    }
+
+    # SQLite WAL 模式（提高并发写入性能）
+    @staticmethod
+    def init_db_wal(db_uri):
+        """在连接后启用 WAL 模式"""
+        if db_uri.startswith('sqlite:///'):
+            import sqlite3
+            db_path = db_uri.replace('sqlite:///', '')
+            conn = sqlite3.connect(db_path)
+            conn.execute('PRAGMA journal_mode=WAL')
+            conn.execute('PRAGMA synchronous=NORMAL')
+            conn.close()
 
     # 上传文件配置
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
@@ -20,6 +38,6 @@ class Config:
     ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'mov', 'avi', 'wmv', 'webm', 'mkv', 'flv'}
 
     # Whisper 模型配置
-    WHISPER_MODEL_SIZE = 'medium'  # tiny / base / small / medium / large
+    WHISPER_MODEL_SIZE = 'medium'     # tiny / base / small / medium / large
     WHISPER_DEVICE = 'auto'        # auto / cpu / cuda
     WHISPER_COMPUTE_TYPE = 'auto'  # auto / float16 / int8

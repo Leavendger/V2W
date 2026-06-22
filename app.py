@@ -1,9 +1,14 @@
 """V2W — AI 会议助手 Flask 应用入口"""
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
+import logging
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
 from config import Config
 from models import db, File
 from utils import allowed_file, generate_stored_filename
+
+# 日志配置
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(name)s %(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
 
 def create_app():
@@ -19,6 +24,11 @@ def create_app():
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        # 启用 WAL 模式（提高并发性能）
+        from sqlalchemy import text
+        db.session.execute(text('PRAGMA journal_mode=WAL'))
+        db.session.execute(text('PRAGMA synchronous=NORMAL'))
+        db.session.commit()
 
     # ============================================================
     # 路由：首页 — 展示所有文件
@@ -33,7 +43,6 @@ def create_app():
     # ============================================================
     @app.route('/upload', methods=['POST'])
     def upload():
-        # 检查是否有文件
         if 'file' not in request.files:
             flash('未选择文件', 'error')
             return redirect(url_for('index'))
@@ -46,7 +55,7 @@ def create_app():
         # 校验格式
         is_allowed, file_type = allowed_file(file.filename, app.config)
         if not is_allowed:
-            flash(f'不支持的格式，请上传常见音视频文件', 'error')
+            flash('不支持的格式，请上传常见音视频文件', 'error')
             return redirect(url_for('index'))
 
         # 生成唯一文件名并保存
@@ -57,7 +66,7 @@ def create_app():
         # 写入数据库
         file_record = File(
             filename=file.filename,
-            stored_path=stored_name,  # 只存相对名，方便迁移
+            stored_path=stored_name,
             file_type=file_type,
             file_size=os.path.getsize(stored_path),
             status='uploaded',
@@ -65,7 +74,11 @@ def create_app():
         db.session.add(file_record)
         db.session.commit()
 
-        flash(f'「{file.filename}」上传成功，等待转写', 'success')
+        # 加入转写队列
+        from worker import enqueue_file
+        enqueue_file(file_record.id)
+
+        flash(f'「{file.filename}」上传成功，已加入转写队列', 'success')
         return redirect(url_for('index'))
 
     # ============================================================
@@ -75,12 +88,10 @@ def create_app():
     def delete_file(file_id):
         file_record = File.query.get_or_404(file_id)
 
-        # 删除磁盘文件
         disk_path = os.path.join(app.config['UPLOAD_FOLDER'], file_record.stored_path)
         if os.path.exists(disk_path):
             os.remove(disk_path)
 
-        # 删除数据库记录（级联删除 segments）
         db.session.delete(file_record)
         db.session.commit()
 
@@ -88,14 +99,37 @@ def create_app():
         return redirect(url_for('index'))
 
     # ============================================================
-    # 路由：文件详情占位（完整实现见 P4）
+    # 路由：文件详情（P4 完善播放器交互）
     # ============================================================
     @app.route('/file/<int:file_id>')
     def file_detail(file_id):
-        from flask import render_template as rt
         file_record = File.query.get_or_404(file_id)
         segments = file_record.segments.all()
-        return rt('detail.html', file=file_record, segments=segments)
+        return render_template('detail.html', file=file_record, segments=segments)
+
+    # ============================================================
+    # API：转写状态查询（前端轮询用）
+    # ============================================================
+    @app.route('/api/file/<int:file_id>/status')
+    def api_file_status(file_id):
+        file_record = File.query.get_or_404(file_id)
+        return jsonify({
+            'id': file_record.id,
+            'status': file_record.status,
+            'status_label': file_record.status_label,
+            'error_message': file_record.error_message,
+            'duration': file_record.duration,
+            'segment_count': file_record.segments.count(),
+        })
+
+    # ============================================================
+    # API：转写段落数据
+    # ============================================================
+    @app.route('/api/file/<int:file_id>/segments')
+    def api_file_segments(file_id):
+        file_record = File.query.get_or_404(file_id)
+        segments = file_record.segments.all()
+        return jsonify([s.to_dict() for s in segments])
 
     # ============================================================
     # 路由：上传文件访问
@@ -105,7 +139,7 @@ def create_app():
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
     # ============================================================
-    # 上下文注入 — 模板可用函数
+    # 上下文注入
     # ============================================================
     @app.context_processor
     def utility_processor():
@@ -114,6 +148,23 @@ def create_app():
             file_emoji=get_file_type_emoji,
             format_size=format_file_size,
         )
+
+    # ============================================================
+    # 启动后台 worker
+    # 注意：Flask debug 模式会启动 reloader，父进程创建 app 后 spawn 子进程。
+    # WERKZEUG_RUN_MAIN 只在子进程中被设为 'true'，需在此处才启动 worker。
+    # ============================================================
+    if os.environ.get('WERKZEUG_RUN_MAIN') is None:
+        # 非 reloader 模式（直接 python app.py 或生产环境），直接启动
+        from worker import start_worker
+        start_worker(app)
+        logger.info('Worker started (no reloader)')
+    elif os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        # Flask reloader 子进程，启动 worker
+        from worker import start_worker
+        start_worker(app)
+        logger.info('Worker started (reloader child)')
+    # 否则是 reloader 父进程，跳过
 
     return app
 

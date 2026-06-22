@@ -68,5 +68,44 @@ document.getElementById('upload-input').addEventListener('change', function() {
         document.getElementById('upload-form').submit();
     }
 });
+
+// 轮询：检查是否有处理中的文件，有则定时刷新
+(function() {
+    var pendingIds = [
+        {% for file in files %}
+        {% if file.status in ('uploaded', 'processing') %}
+        {{ file.id }},
+        {% endif %}
+        {% endfor %}
+    ];
+
+    if (pendingIds.length === 0) return;
+
+    var pollCount = 0;
+    var maxPolls = 300; // 最多轮询 300 次（约 15 分钟）
+
+    function poll() {
+        if (pollCount >= maxPolls) return;
+        pollCount++;
+
+        // 查询第一个待处理文件的状态
+        fetch('/api/file/' + pendingIds[0] + '/status')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.status === 'completed' || data.status === 'failed') {
+                    // 状态已变化，刷新页面
+                    location.reload();
+                } else {
+                    // 继续轮询
+                    setTimeout(poll, 3000);
+                }
+            })
+            .catch(function() {
+                setTimeout(poll, 3000);
+            });
+    }
+
+    setTimeout(poll, 2000); // 首次 2 秒后开始
+})();
 </script>
 {% endblock %}
