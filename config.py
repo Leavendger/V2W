@@ -41,6 +41,6 @@ class Config:
     # Whisper 模型配置
     # small: 490MB，中文识别良好，转写速度约 1:3（1 小时音频 ≈ 20 分钟处理）
     # medium: 1.5GB，中文最佳，速度约 1:8
-    WHISPER_MODEL_SIZE = 'small'      # tiny / base / small / medium / large
+    WHISPER_MODEL_SIZE = 'medium'      # tiny / base / small / medium / large
     WHISPER_DEVICE = 'auto'           # auto / cpu / cuda
     WHISPER_COMPUTE_TYPE = 'auto'     # auto 自动选最优（CPU=int8, GPU=float16）

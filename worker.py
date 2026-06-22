@@ -142,7 +142,7 @@ def _worker_loop(app):
 
                 # 5. 更新文件信息
                 file_record.status = 'completed'
-                file_record.transcribed_at = datetime.utcnow()
+                file_record.transcribed_at = datetime.now()
                 if segments:
                     file_record.duration = segments[-1]['end']
                 _db_commit_with_retry(db.session)
