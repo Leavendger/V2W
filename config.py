@@ -6,6 +6,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class Config:
     """基础配置"""
+    # 开发环境使用默认值；生产环境请设置环境变量 SECRET_KEY
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'v2w-dev-secret-key-change-in-prod'
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(BASE_DIR, 'instance', 'v2w.db')

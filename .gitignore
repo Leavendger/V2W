@@ -16,6 +16,9 @@ __pycache__/
 .vscode/
 .idea/
 
+# Claude Code 本地配置
+.claude/
+
 # 系统文件
 .DS_Store
 Thumbs.db
