@@ -6,46 +6,180 @@
 <a href="/" class="back-link">← 返回文件列表</a>
 
 <div class="detail-container">
-    <div class="page-header" style="margin-bottom:20px">
-        <div class="header-left">
-            <h1>{{ file_emoji(file.file_type) }} {{ file.filename }}</h1>
+    <!-- 文件信息头 -->
+    <div class="detail-header">
+        <div class="detail-header-left">
+            <span class="detail-icon">{{ file_emoji(file.file_type) }}</span>
+            <div>
+                <h1 class="detail-title">{{ file.filename }}</h1>
+                <span class="detail-meta">{{ format_size(file.file_size) }}
+                    {% if file.duration %} · {{ (file.duration|int) // 60 }}:{{ '%02d' % ((file.duration|int) % 60) }}{% endif %}
+                </span>
+            </div>
         </div>
         <span class="status-badge status-{{ file.status }}">{{ file.status_label }}</span>
     </div>
 
-    <div class="player-area">
-        {% if file.status == 'completed' %}
+    <!-- 播放器区域 -->
+    <div class="player-area" id="player-area">
+        {% if file.status == 'completed' and file.file_type in ('audio', 'video') %}
             {% if file.file_type == 'video' %}
-            <video controls src="{{ url_for('uploaded_file', filename=file.stored_path) }}"></video>
+            <video id="player" controls src="{{ url_for('uploaded_file', filename=file.stored_path) }}"
+                   preload="metadata"></video>
             {% else %}
-            <audio controls src="{{ url_for('uploaded_file', filename=file.stored_path) }}"></audio>
+            <audio id="player" controls src="{{ url_for('uploaded_file', filename=file.stored_path) }}"
+                   preload="metadata"></audio>
             {% endif %}
+        {% elif file.status == 'processing' %}
+            <div class="player-placeholder processing-state">
+                <div class="spinner"></div>
+                <p>正在转写中，完成后即可播放&hellip;</p>
+            </div>
+        {% elif file.status == 'uploaded' %}
+            <div class="player-placeholder">
+                <p>🟡 排队等待转写中，稍后即可播放</p>
+            </div>
+        {% elif file.status == 'failed' %}
+            <div class="player-placeholder error-state">
+                <p>🔴 转写失败</p>
+                {% if file.error_message %}
+                <p class="error-detail">{{ file.error_message }}</p>
+                {% endif %}
+            </div>
         {% else %}
-            <div class="no-player">
-                <p>{% if file.status == 'processing' %}🔵 正在转写中，完成后即可播放{% elif file.status == 'uploaded' %}🟡 等待转写中{% else %}🔴 转写失败{% endif %}</p>
+            <div class="player-placeholder">
+                <p>暂不可用</p>
             </div>
         {% endif %}
     </div>
 
-    {% if segments %}
-    <div class="segments-list">
-        {% for seg in segments %}
-        <div class="segment-item" data-start="{{ seg.start_time }}">
-            <span class="segment-time">{{ seg.formatted_time }}</span>
-            <span class="segment-text">{{ seg.text }}</span>
+    <!-- 转写文字区 -->
+    <div class="transcript-section" id="transcript-section">
+        <h2 class="transcript-title">📝 转写内容</h2>
+
+        {% if file.status == 'completed' and segments %}
+        <div class="segments-list" id="segments-list">
+            {% for seg in segments %}
+            <div class="segment-item" data-start="{{ seg.start_time }}" data-end="{{ seg.end_time }}"
+                 data-index="{{ seg.segment_index }}">
+                <span class="segment-time">{{ seg.formatted_time }}</span>
+                <span class="segment-text">{{ seg.text }}</span>
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <p style="text-align:center;color:var(--text-secondary);padding:40px">
-        {% if file.status == 'completed' %}
-        转写完成，暂无文字内容
+        {% elif file.status == 'processing' %}
+        <div class="transcript-placeholder">
+            <p>转写进行中，请稍候&hellip;</p>
+            <p class="hint">完成后文字将自动出现在此处</p>
+        </div>
         {% elif file.status == 'failed' %}
-        转写失败：{{ file.error_message or '未知错误' }}
+        <div class="transcript-placeholder error-state">
+            <p>转写失败</p>
+            {% if file.error_message %}
+            <p class="error-detail">{{ file.error_message }}</p>
+            {% endif %}
+        </div>
         {% else %}
-        正在等待转写&hellip;
+        <div class="transcript-placeholder">
+            <p>等待转写开始&hellip;</p>
+        </div>
         {% endif %}
-    </p>
-    {% endif %}
+    </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var player = document.getElementById('player');
+    var items = document.querySelectorAll('.segment-item');
+    var status = '{{ file.status }}';
+
+    // ============================================================
+    // 状态轮询（处理中→完成时刷新页面）
+    // ============================================================
+    if (status === 'processing' || status === 'uploaded') {
+        (function poll() {
+            fetch('/api/file/{{ file.id }}/status')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        location.reload();
+                    } else {
+                        setTimeout(poll, 3000);
+                    }
+                })
+                .catch(function() { setTimeout(poll, 3000); });
+        })();
+    }
+
+    // ============================================================
+    // 如果播放器和段落都存在，启用交互
+    // ============================================================
+    if (!player || items.length === 0) return;
+
+    var currentActive = null;
+
+    // ---------- 点击段落 → 跳转播放 ----------
+    items.forEach(function(item) {
+        item.addEventListener('click', function() {
+            var start = parseFloat(item.getAttribute('data-start'));
+            if (!isNaN(start)) {
+                player.currentTime = start;
+                player.play();
+            }
+        });
+    });
+
+    // ---------- 播放中 → 高亮当前段落 ----------
+    player.addEventListener('timeupdate', function() {
+        var t = player.currentTime;
+        var found = null;
+
+        for (var i = 0; i < items.length; i++) {
+            var start = parseFloat(items[i].getAttribute('data-start'));
+            var end = parseFloat(items[i].getAttribute('data-end'));
+            if (t >= start && t < end) {
+                found = items[i];
+                break;
+            }
+        }
+
+        if (found !== currentActive) {
+            // 移除旧高亮
+            if (currentActive) {
+                currentActive.classList.remove('active');
+            }
+            // 添加新高亮
+            if (found) {
+                found.classList.add('active');
+                // 滚动到可见区域
+                found.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            currentActive = found;
+        }
+    });
+
+    // ---------- 键盘快捷键 ----------
+    document.addEventListener('keydown', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        switch (e.key) {
+            case ' ':  // 空格：播放/暂停
+                e.preventDefault();
+                if (player.paused) player.play();
+                else player.pause();
+                break;
+            case 'ArrowLeft':  // ← 后退 5 秒
+                e.preventDefault();
+                player.currentTime = Math.max(0, player.currentTime - 5);
+                break;
+            case 'ArrowRight':  // → 前进 5 秒
+                e.preventDefault();
+                player.currentTime = Math.min(player.duration, player.currentTime + 5);
+                break;
+        }
+    });
+})();
+</script>
 {% endblock %}

@@ -341,7 +341,7 @@ a { text-decoration: none; color: inherit; }
 }
 
 /* ============================================================
-   详情页（P4 会完善）
+   详情页
    ============================================================ */
 .detail-container {
     background: var(--bg-card);
@@ -361,40 +361,136 @@ a { text-decoration: none; color: inherit; }
 
 .back-link:hover { text-decoration: underline; }
 
+/* 详情头部 */
+.detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.detail-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.detail-icon { font-size: 32px; }
+
+.detail-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.detail-meta {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+/* 播放器区域 */
 .player-area {
     background: #000;
     border-radius: var(--radius);
     margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 240px;
+    overflow: hidden;
 }
 
-.player-area video,
-.player-area audio {
+.player-area video {
     width: 100%;
     max-height: 480px;
+    display: block;
 }
 
-.player-area .no-player {
-    color: #888;
+.player-area audio {
+    width: 100%;
+    display: block;
+    margin: 20px 0;
+}
+
+/* 播放器占位（非完成状态） */
+.player-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+    color: var(--text-secondary);
+    font-size: 15px;
+    background: #f5f5f5;
+}
+
+.player-placeholder p { margin: 6px 0; }
+
+.player-placeholder.error-state { color: var(--danger); }
+
+.player-placeholder .error-detail {
+    font-size: 13px;
+    max-width: 400px;
+    text-align: center;
+    word-break: break-all;
+}
+
+/* 转圈动画 */
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e0e0e0;
+    border-top: 3px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 转写区域 */
+.transcript-section {
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+}
+
+.transcript-title {
     font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
 }
 
+.transcript-placeholder {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.transcript-placeholder .hint {
+    font-size: 13px;
+    margin-top: 6px;
+}
+
+/* 段落列表 */
 .segments-list {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
+    max-height: 60vh;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px;
 }
 
 .segment-item {
     display: flex;
-    gap: 16px;
-    padding: 10px 12px;
+    gap: 14px;
+    padding: 10px 14px;
     border-radius: 6px;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.15s, border-color 0.15s;
+    border-left: 3px solid transparent;
 }
 
 .segment-item:hover {
@@ -404,21 +500,31 @@ a { text-decoration: none; color: inherit; }
 .segment-item.active {
     background: #e3f2fd;
     border-left: 3px solid var(--primary);
-    padding-left: 9px;
 }
 
 .segment-time {
-    font-family: "SF Mono", Monaco, monospace;
+    font-family: "SF Mono", Monaco, "Courier New", monospace;
     font-size: 13px;
     color: var(--primary);
     white-space: nowrap;
-    min-width: 48px;
-    padding-top: 1px;
+    min-width: 44px;
+    padding-top: 2px;
+    font-weight: 500;
 }
 
 .segment-text {
     font-size: 15px;
     line-height: 1.6;
+    color: var(--text-primary);
+}
+
+/* 详情页处理中——轮询自动刷新提示 */
+.polling-hint {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 8px;
+    animation: pulse 2s infinite;
 }
 
 /* ============================================================
