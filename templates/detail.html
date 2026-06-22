@@ -3,11 +3,10 @@
 {% block title %}{{ file.filename }} — V2W{% endblock %}
 
 {% block content %}
-<a href="/" class="back-link">← 返回文件列表</a>
-
-<!-- 音频文件：播放器固定在顶部 -->
+<!-- 音频文件：播放器+返回链接固定在顶部 -->
 {% if file.status == 'completed' and file.file_type == 'audio' %}
 <div class="audio-sticky-bar" id="audio-sticky-bar">
+    <a href="/" class="back-link back-link-sticky">← 返回</a>
     <div class="audio-sticky-inner">
         <span class="audio-sticky-icon">🎵</span>
         <div class="audio-sticky-info">
@@ -21,6 +20,8 @@
                preload="metadata"></audio>
     </div>
 </div>
+{% else %}
+<a href="/" class="back-link">← 返回文件列表</a>
 {% endif %}
 
 <div class="detail-container {% if file.file_type == 'video' %}detail-video-layout{% endif %}">

@@ -443,13 +443,13 @@ button { cursor: pointer; font-family: inherit; }
 /* ---- 音频固定条 ---- */
 .audio-sticky-bar {
     position: sticky;
-    top: 60px;              /* 导航栏高度 */
+    top: 60px;              /* 导航栏下方 */
     z-index: 50;
     background: var(--bg-card);
     border-bottom: 1px solid var(--border);
     box-shadow: var(--shadow-md);
-    padding: 10px 28px;
-    margin: -36px -28px 20px -28px;  /* 撑满 main-container 宽度，并贴顶 */
+    padding: 8px 28px 10px;
+    margin: -36px -28px 20px -28px;  /* 撑满宽度 + 贴顶 */
 }
 
 .audio-sticky-inner {
@@ -458,6 +458,15 @@ button { cursor: pointer; font-family: inherit; }
     display: flex;
     align-items: center;
     gap: 14px;
+}
+
+/* 返回链接在固定条内 */
+.back-link-sticky {
+    display: block;
+    max-width: 1200px;
+    margin: 0 auto 6px;
+    padding: 0;
+    font-size: 12px;
 }
 
 .audio-sticky-icon { font-size: 28px; flex-shrink: 0; }
