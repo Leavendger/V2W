@@ -164,6 +164,15 @@
 - 点击：`GET /file/<id>/export`，浏览器下载 `{原文件名}.md`
 - 与状态标签并列于 `.detail-header-actions`
 
+### 说话人标签（迭代 P9）
+
+> 详见 [speaker-diarization-design.md](speaker-diarization-design.md)。仅在开启说话人分离时显示。
+
+- 位置：段落文字前（段首小标签）
+- 文案：「说话人 1 / 2 / 3」（pyannote 的 `SPEAKER_00` 映射）
+- 样式：药丸标签，蓝系（与时间戳协调）
+- 未识别（未开启分离 / 失败）：不显示标签，导出仍为 `[发言人]` 占位
+
 ## 5. 响应式
 
 - **桌面端（>1024px）**：详情页左右分栏（播放器 + 转写区）

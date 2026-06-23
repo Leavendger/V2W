@@ -54,7 +54,7 @@
 ### 环境要求
 
 - macOS (Apple Silicon M 系列)
-- Python 3.13+
+- Python 3.11（说话人分离 pyannote.audio 需 3.11，建议用 conda / miniforge）
 - FFmpeg
 
 ### 安装与启动
@@ -67,12 +67,15 @@ cd V2W
 # 2. 安装 FFmpeg（如未安装）
 brew install ffmpeg
 
-# 3. 创建虚拟环境并安装依赖
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# 3. 创建 py3.11 虚拟环境并安装依赖（说话人分离需 py3.11 + 黄金依赖组合）
+conda create -y -p venv python=3.11
+conda activate ./venv
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 4. 启动服务（本地访问）
+# 4.（说话人分离）配置 HF token，详见 docs/hf-token-setup.md
+#    在项目根目录创建 .env 文件：HF_TOKEN=hf_xxx
+
+# 5. 启动服务（本地访问）
 python app.py
 # → http://127.0.0.1:8080
 ```
@@ -143,7 +146,7 @@ V2W/
 
 ### 下一阶段
 
-- [ ] 说话人分离（pyannote.audio，区分发言人 A/B）
+- [ ] 说话人分离（[设计](docs/speaker-diarization-design.md) · [HF token 配置](docs/hf-token-setup.md) · pyannote + 开关按需）
 - [ ] AI 自动总结（生成会议摘要）
 - [ ] 关键词与待办事项提取
 - [x] 全文搜索（[设计](docs/search-design.md) · 单文件内 P6 + 全局 P7，含项目名检索与「全部/项目名/转文字」三类 Tab）

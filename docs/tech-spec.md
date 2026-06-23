@@ -11,6 +11,7 @@
 | ORM | Flask-SQLAlchemy | 3.x | 数据库操作便捷 |
 | 数据库 | SQLite | — | 零配置，单文件，无需安装服务 |
 | ASR 引擎 | faster-whisper | 1.x | 基于 CTranslate2，比 openai-whisper 快 4 倍 |
+| 说话人分离 | pyannote.audio | 3.x | 工业级 diarization（迭代 P9，需 HF token） |
 | 音频处理 | FFmpeg | 7.x | 业界标准，视频提取音频 |
 | 前端 | Jinja2 + 原生 JS | — | 无构建工具，直接渲染 |
 | 异步任务 | Python threading | — | 单用户 MVP 足够 |
@@ -90,6 +91,7 @@ V2W/
 | end_time | FLOAT | 结束时间（秒） |
 | text | TEXT | 转写文字 |
 | segment_index | INTEGER | 段落排序索引 |
+| speaker | VARCHAR(32) | 说话人标签（P9，如 SPEAKER_00；NULL 未识别） |
 
 ## 5. API 路由
 

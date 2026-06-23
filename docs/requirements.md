@@ -59,10 +59,17 @@ V2W (Voice to Words) 是一款 Web 端的会议记录工具。用户上传会议
 
 > 详情页对已完成文件一键导出 `.md`：含文件名标题、时长 / 转写时间、每段「**[发言人]**（占位，待接入说话人分离）+ 时间戳 + 文字」。
 
+### 2.9 说话人分离（已立项设计，待实现）
+
+> 详细设计见 [docs/speaker-diarization-design.md](speaker-diarization-design.md)，前置 HF token 见 [docs/hf-token-setup.md](hf-token-setup.md)。
+
+- **方案**：pyannote.audio 说话人分离（保留现有 faster-whisper，新增 diarizer + 时间对齐）
+- **开关按需**：上传时勾选「识别说话人」才跑（分离较慢）；不勾维持 `[发言人]` 占位
+- **效果**：详情页段落归属「说话人 1/2/3」，导出 Markdown 自动显示说话人（衔接预留扩展点）
+
 ## 3. 不在 MVP 范围（后续迭代）
 
 以下功能记录在 README.md 中，MVP 暂不实现：
-- 说话人区分
 - AI 自动总结
 - 关键词提取
 - 待办事项提取

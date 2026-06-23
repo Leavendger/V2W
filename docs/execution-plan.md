@@ -15,6 +15,7 @@
 | P6 | 全文搜索（单文件内） | 3 | 详情页内关键词搜索、高亮、导航、跳转播放 |
 | P7 | 全文搜索（全局） | 2 | 首页跨文件搜索、结果页、深链定位 |
 | P8 | 导出 Markdown | 2 | 详情页导出 .md（说话人 tag + 时间戳 + 文字） |
+| P9 | 说话人分离 | 3 | pyannote 区分说话人，详情页/导出归属（开关按需） |
 
 ---
 
@@ -196,6 +197,35 @@ python app.py
 
 ---
 
+## P9 — 说话人分离（pyannote · 开关按需）
+
+> 对应 [speaker-diarization-design.md](speaker-diarization-design.md)；前置 HF token 见 [hf-token-setup.md](hf-token-setup.md)。
+
+**目标**：区分「谁在说话」，段落归属到说话人；导出从 `[发言人]` 自动变为「说话人 N」。
+
+### 任务清单（P9a）
+- [ ] `config.py` 加 `DIARIZATION_ENABLED` + `HF_TOKEN`
+- [ ] `models.py` `TranscriptSegment` 加 `speaker` 字段 + 启动自动迁移加列
+- [ ] 新建 `diarizer.py`（pyannote 加载 + diarize + assign_speakers 对齐）
+- [ ] `transcriber.py` 开 `word_timestamps=True`
+- [ ] `worker.py` 开关分支：diarize + 对齐，写 speaker；token 缺失优雅降级
+- [ ] `utils.py` `speaker_label()` 读 `seg.speaker` + 友好映射（说话人 1/2/3）
+- [ ] `detail.html` 段落显示说话人；`index.html` 上传勾选「识别说话人」
+- [ ] `app.py` 上传接 `diarize` 参数
+
+### 验证标准
+- 勾选上传 → 段落带 speaker，详情页显示「说话人 N」
+- 导出 md 显示「**说话人 N**」（衔接 speaker_label 预留点）
+- 不勾选 → 行为不变，全 `[发言人]`
+- 现有库升级不丢数据（speaker 为 NULL，显示占位）
+- token 缺失时优雅降级，转写正常
+
+### 后续
+- P9b：历史文件「重新识别说话人」按钮 + 说话人重命名
+- P9c：按说话人筛选 / 统计
+
+---
+
 ## 各阶段依赖关系
 
 ```
@@ -203,4 +233,5 @@ P0 ──→ P1 ──→ P2 ──→ P3 ──→ P4 ──→ P5
                                   └── P2+P3 都完成即可开始
 P4 ──→ P6（单文件内搜索）──→ P7（全局搜索）
 P4 ──→ P8（导出 Markdown）
+P3 ──→ P9（说话人分离，依赖 ASR 管线）
 ```
