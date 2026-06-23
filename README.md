@@ -146,7 +146,7 @@ V2W/
 
 ### 下一阶段
 
-- [ ] 说话人分离（[设计](docs/speaker-diarization-design.md) · [HF token 配置](docs/hf-token-setup.md) · pyannote + 开关按需）
+- [x] 说话人分离（[设计](docs/speaker-diarization-design.md) · [HF token 配置](docs/hf-token-setup.md) · pyannote，识别说话人/快速转写切换，音频+视频已验证）
 - [ ] AI 自动总结（生成会议摘要）
 - [ ] 关键词与待办事项提取
 - [x] 全文搜索（[设计](docs/search-design.md) · 单文件内 P6 + 全局 P7，含项目名检索与「全部/项目名/转文字」三类 Tab）

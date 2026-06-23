@@ -87,6 +87,34 @@ with app.app_context():
 
 开关关闭时，跳过 diarization 与对齐，行为与现在完全一致。
 
+### 5.1 diarize 前转 wav（关键，规避损坏 mp3）
+
+pyannote 用 mpg123 解码 mp3，**损坏的 MPEG 头会直接失败**（`Illegal Audio-MPEG-Header` → `Unspecified internal error`），静默降级导致 speaker 全空。而 faster-whisper 用 ffmpeg 解码（容错），所以转写正常、只有分离失败。
+
+**修复**：diarize 前一律用 ffmpeg 转 16k mono wav 再喂给 pyannote（视频已 extract_audio 到 wav，跳过；音频 mp3 等转码）：
+
+```python
+diarize_audio = audio_path
+temp_wav = None
+if not audio_path.endswith('.wav'):
+    diarize_audio = audio_path + '.diarize.wav'
+    temp_wav = diarize_audio
+    extract_audio(audio_path, diarize_audio)   # 复用 ffmpeg 转 16k mono
+timeline = diarize(diarize_audio, hf_token)
+if temp_wav and os.path.exists(temp_wav):
+    os.remove(temp_wav)
+```
+
+### 5.2 Worker 健壮性（删除转写中文件）
+
+「删除正在转写的文件后重新上传一直排队」的 bug 修复链（详见 [dev_logs/2026-06-24.md](../dev_logs/2026-06-24.md)）：
+
+1. **files.id AUTOINCREMENT**：SQLite rowid 删除会复用 → id 复用导致取消标记误杀新文件。改 AUTOINCREMENT（启动迁移重建表，保留数据）。
+2. **transcribe 可中断**：`transcribe_iter()` 生成器，worker 逐段消费 + 每段检查删除则 `break`（不阻塞队列）。
+3. **删除检测用 SQL 直查**：`_is_file_deleted()` 绕过 SQLAlchemy session 缓存（`File.query.get` 会返回缓存的已删对象）。
+4. **except 块稳健**：except 内操作已删 file_record 会抛 `StaleDataError` 致 worker 线程崩溃 → 先 SQL 查文件是否还在，不在则跳过状态更新，保证 worker 存活。
+5. **性能**：40 分钟音频转写+分离 ≈ 30 分钟（M4 CPU，近实时）。
+
 ## 6. diarizer.py 设计
 
 ```python
