@@ -69,3 +69,32 @@ def transcribe(audio_path, model_size='medium', device='auto', compute_type='aut
                 f'duration={results[-1]["end"] if results else 0:.1f}s')
 
     return results, info.language
+
+
+def transcribe_iter(audio_path, model_size='medium', device='auto', compute_type='auto', language=None):
+    """转写音频，返回 (段落生成器, 语言)。
+
+    生成器逐段 yield {'start','end','text'}；调用方可边消费边检查取消条件并 break，
+    从而中断 Whisper 推理（删除文件时及时终止转写，不必等整段跑完）。
+    """
+    model = get_model(model_size, device, compute_type)
+    logger.info(f'Transcribing: {audio_path}')
+    segments, info = model.transcribe(
+        audio_path,
+        language=language,
+        beam_size=1,
+        best_of=1,
+        vad_filter=True,
+        vad_parameters=dict(min_silence_duration_ms=500),
+        condition_on_previous_text=False,
+        word_timestamps=True,
+    )
+    logger.info(f'Detected language: {info.language} (probability={info.language_probability:.2f})')
+
+    def _gen():
+        for segment in segments:
+            text = segment.text.strip()
+            if text:
+                yield {'start': round(segment.start, 2), 'end': round(segment.end, 2), 'text': text}
+
+    return _gen(), info.language

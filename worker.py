@@ -86,7 +86,7 @@ def start_worker(app):
 def _worker_loop(app):
     """后台线程主循环"""
     from models import db, File, TranscriptSegment
-    from transcriber import transcribe
+    from transcriber import transcribe_iter
 
     while True:
         file_id = _queue.get()  # 阻塞等待新任务
@@ -127,14 +127,26 @@ def _worker_loop(app):
                         os.remove(audio_path)
                     continue
 
-                # 3. 转写
+                # 3. 转写（逐段消费，每段检查文件是否被删 → 可中断推理）
                 logger.info(f'Starting transcription: {audio_path}')
-                segments, language = transcribe(
+                seg_gen, language = transcribe_iter(
                     audio_path,
                     model_size=app.config.get('WHISPER_MODEL_SIZE', 'medium'),
                     device=app.config.get('WHISPER_DEVICE', 'auto'),
                     compute_type=app.config.get('WHISPER_COMPUTE_TYPE', 'auto'),
                 )
+                segments = []
+                aborted = False
+                for seg in seg_gen:
+                    if File.query.get(file_id) is None:
+                        logger.info(f'File {file_id} deleted during transcription, aborting')
+                        aborted = True
+                        break
+                    segments.append(seg)
+                if aborted:
+                    if file_record.file_type == 'video' and os.path.exists(audio_path):
+                        os.remove(audio_path)
+                    continue
 
                 # 3.5 说话人分离（按需：文件勾选 + 全局开关 + token）
                 speakers_assigned = False
