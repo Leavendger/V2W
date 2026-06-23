@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}搜索{% if q %}「{{ q }}」{% endif %} — V2W{% endblock %}
+
+{% block content %}
+<div class="search-page">
+    <h1 class="search-page-title">
+        {% if q %}
+            搜索「<span class="search-page-query">{{ q }}</span>」
+        {% else %}
+            全文搜索
+        {% endif %}
+    </h1>
+
+    {% if q %}
+    {% set show_name = tab in ('all', 'name') and name_files %}
+    {% set show_content = tab in ('all', 'content') and content_groups %}
+
+    <!-- Tab 栏 -->
+    <div class="search-tabs">
+        <a class="search-tab {% if tab == 'all' %}active{% endif %}"
+           href="{{ url_for('search', q=q, tab='all') }}">
+            全部 <span class="count">{{ total_count }}</span>
+        </a>
+        <a class="search-tab {% if tab == 'name' %}active{% endif %}"
+           href="{{ url_for('search', q=q, tab='name') }}">
+            项目名 <span class="count">{{ name_count }}</span>
+        </a>
+        <a class="search-tab {% if tab == 'content' %}active{% endif %}"
+           href="{{ url_for('search', q=q, tab='content') }}">
+            转文字 <span class="count">{{ content_count }}</span>
+        </a>
+    </div>
+
+    {% if total_count == 0 %}
+    <div class="search-empty">
+        <div class="empty-icon">🔍</div>
+        <p>没有找到包含「{{ q }}」的内容</p>
+        <p class="hint">换个关键词试试？</p>
+    </div>
+    {% elif not show_name and not show_content %}
+    {% set tab_label = '项目名' if tab == 'name' else '转文字' %}
+    <div class="search-empty">
+        <div class="empty-icon">📭</div>
+        <p>「{{ tab_label }}」分类下无结果</p>
+        <p class="hint">试试切换到「全部」或其他分类</p>
+    </div>
+    {% else %}
+
+    {% if show_name %}
+    <section class="search-section">
+        <h2 class="search-section-title">📄 项目名命中 <span class="count">{{ name_count }}</span></h2>
+        <div class="search-name-list">
+            {% for f in name_files %}
+            <a class="search-name-item" href="{{ url_for('file_detail', file_id=f.id) }}">
+                <span class="search-name-icon">{{ file_emoji(f.file_type) }}</span>
+                <span class="search-name-text">{{ f.filename|highlight(q) }}</span>
+                <span class="status-badge status-{{ f.status }}">{{ f.status_label }}</span>
+                {% if f.duration %}
+                <span class="search-name-meta">{{ (f.duration|int) // 60 }}:{{ '%02d' % ((f.duration|int) % 60) }}</span>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if show_content %}
+    <section class="search-section">
+        <h2 class="search-section-title">📝 内容命中 <span class="count">{{ content_count }} 个文件</span></h2>
+        <div class="search-groups">
+            {% for g in content_groups %}
+            <div class="search-group">
+                <div class="search-group-header">
+                    <a href="{{ url_for('file_detail', file_id=g.file.id) }}" class="search-group-file">
+                        <span class="search-group-icon">{{ file_emoji(g.file.file_type) }}</span>
+                        <span class="search-group-name">{{ g.file.filename }}</span>
+                    </a>
+                    <span class="search-group-count">{{ g.hits|length }} 处</span>
+                </div>
+                <div class="search-group-hits">
+                    {% for seg in g.hits %}
+                    <a class="search-hit-item"
+                       href="{{ url_for('file_detail', file_id=g.file.id, q=q, seg=seg.segment_index) }}">
+                        <span class="search-hit-time">{{ seg.formatted_time }}</span>
+                        <span class="search-hit-text">{{ seg.text|highlight(q) }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% endif %}
+    {% else %}
+    <p class="search-page-meta">在上方搜索框输入关键词，跨所有会议检索</p>
+    {% endif %}
+</div>
+{% endblock %}

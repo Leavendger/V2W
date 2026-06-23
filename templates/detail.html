@@ -296,7 +296,7 @@
         }
 
         var searchTimer = null;
-        function doSearch(q) {
+        function doSearch(q, onDone) {
             clearHighlight();
             hits = [];
             currentHit = -1;
@@ -305,6 +305,7 @@
                 searchActive = false;
                 toggleControls(false);
                 updateCount();
+                if (onDone) onDone();
                 return;
             }
 
@@ -328,8 +329,9 @@
                         toggleControls(hits.length > 0);
                         updateCount();
                         if (hits.length) setCurrent(0);
+                        if (onDone) onDone();
                     })
-                    .catch(function() {});
+                    .catch(function() { if (onDone) onDone(); });
             }, 300);
         }
 
@@ -366,11 +368,22 @@
             searchInput.focus();
         });
 
-        // P7 深链支持：URL 带 ?q= 时自动填入并搜索
-        var urlQ = new URLSearchParams(window.location.search).get('q');
+        // P7 深链支持：URL 带 ?q= 时自动填入并搜索；?seg= 则定位到该命中段
+        var params = new URLSearchParams(window.location.search);
+        var urlQ = params.get('q');
+        var urlSeg = params.get('seg');
         if (urlQ) {
             searchInput.value = urlQ;
-            doSearch(urlQ);
+            doSearch(urlQ, function () {
+                if (urlSeg === null) return;
+                var segKey = String(urlSeg);
+                for (var i = 0; i < hits.length; i++) {
+                    if (hits[i].getAttribute('data-index') === segKey) {
+                        setCurrent(i);
+                        break;
+                    }
+                }
+            });
         }
     }
 })();

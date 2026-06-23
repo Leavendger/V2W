@@ -12,6 +12,12 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="/" class="nav-brand">🎙 V2W 会议助手</a>
+            <form class="nav-search" action="{{ url_for('search') }}" method="get" role="search">
+                <span class="nav-search-icon">🔍</span>
+                <input type="text" name="q" class="nav-search-input"
+                       placeholder="搜索所有会议…" autocomplete="off"
+                       value="{{ request.args.get('q', '') }}">
+            </form>
         </div>
     </nav>
 

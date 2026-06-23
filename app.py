@@ -174,6 +174,61 @@ def create_app():
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
     # ============================================================
+    # 路由：全局搜索（项目名 + 转写文字，三类 Tab）
+    # ============================================================
+    @app.route('/search')
+    def search():
+        from models import TranscriptSegment
+        from utils import escape_like
+        from sqlalchemy import func
+
+        q = (request.args.get('q') or '').strip()
+        tab = request.args.get('tab', 'all')
+        if tab not in ('all', 'name', 'content'):
+            tab = 'all'
+
+        if not q:
+            return render_template('search.html', q='', tab=tab,
+                                   name_files=[], content_groups=[],
+                                   name_count=0, content_count=0, total_count=0)
+
+        kw = '%' + escape_like(q.lower()) + '%'
+
+        # 1) 项目名命中：文件名 LIKE（所有状态文件，含未转写完成的）
+        name_files = (File.query
+                      .filter(func.lower(File.filename).like(kw, escape='\\'))
+                      .order_by(File.created_at.desc()).all())
+
+        # 2) 转写命中：仅 completed，一次 join 避免 N+1，按文件分组
+        results = (db.session.query(TranscriptSegment, File)
+                   .join(File, TranscriptSegment.file_id == File.id)
+                   .filter(File.status == 'completed')
+                   .filter(func.lower(TranscriptSegment.text).like(kw, escape='\\'))
+                   .order_by(File.created_at.desc(), TranscriptSegment.segment_index)
+                   .all())
+        content_groups = []
+        file_pos = {}
+        for seg, file in results:
+            pos = file_pos.get(file.id)
+            if pos is None:
+                file_pos[file.id] = len(content_groups)
+                content_groups.append({'file': file, 'hits': [seg]})
+            else:
+                content_groups[pos]['hits'].append(seg)
+
+        name_count = len(name_files)
+        content_count = len(content_groups)
+        # 全部 = 项目名与转写命中的文件去重并集
+        all_file_ids = set(f.id for f in name_files)
+        all_file_ids |= set(g['file'].id for g in content_groups)
+        total_count = len(all_file_ids)
+
+        return render_template('search.html', q=q, tab=tab,
+                               name_files=name_files, content_groups=content_groups,
+                               name_count=name_count, content_count=content_count,
+                               total_count=total_count)
+
+    # ============================================================
     # 上下文注入
     # ============================================================
     @app.context_processor
@@ -183,6 +238,30 @@ def create_app():
             file_emoji=get_file_type_emoji,
             format_size=format_file_size,
         )
+
+    # ============================================================
+    # Jinja 过滤器：服务端关键词高亮（迭代 P7）
+    # ============================================================
+    @app.template_filter('highlight')
+    def highlight_filter(text, q):
+        from markupsafe import Markup, escape
+        text = text or ''
+        if not q:
+            return Markup(str(escape(text)))
+        ql = q.lower()
+        tl = text.lower()
+        out = []
+        last = 0
+        idx = tl.find(ql)
+        while idx != -1:
+            out.append(str(escape(text[last:idx])))
+            out.append('<mark>')
+            out.append(str(escape(text[idx:idx + len(q)])))
+            out.append('</mark>')
+            last = idx + len(q)
+            idx = tl.find(ql, last)
+        out.append(str(escape(text[last:])))
+        return Markup(''.join(out))
 
     # ============================================================
     # 启动后台 worker
