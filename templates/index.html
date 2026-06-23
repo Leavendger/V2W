@@ -63,7 +63,7 @@
 
 <!-- 隐藏的上传 input，由 label 触发 -->
 <form id="upload-form" action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data">
-    <input type="hidden" name="diarize" id="diarize-flag" value="">
+    <input type="hidden" name="diarize" id="diarize-flag" value="1">
     <input id="upload-input" type="file" name="file" accept=".mp4,.mov,.avi,.wmv,.webm,.mkv,.flv,.mp3,.wav,.m4a,.flac,.aac,.ogg,.wma"
            onchange="this.form.submit()" hidden>
 </form>
