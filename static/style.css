@@ -1189,3 +1189,60 @@ mark {
     .file-card { padding: 16px 12px; }
     .file-card-icon { font-size: 34px; }
 }
+
+/* 终止转写任务提示（右下角 toast） */
+.terminate-toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 1000;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 14px 18px;
+    min-width: 260px;
+    animation: terminateIn 0.3s ease;
+}
+.terminate-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.terminate-icon { font-size: 16px; }
+.terminate-progress {
+    margin-top: 10px;
+    height: 4px;
+    background: var(--border-light);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.terminate-progress-bar {
+    height: 100%;
+    width: 40%;
+    background: var(--primary);
+    border-radius: 2px;
+    animation: terminateBar 1.2s ease-in-out infinite;
+}
+.terminate-done .terminate-progress-bar {
+    width: 100%;
+    background: var(--success);
+    animation: none;
+}
+.terminate-hide {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+}
+@keyframes terminateIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes terminateBar {
+    0%   { margin-left: -40%; }
+    50%  { margin-left: 50%; }
+    100% { margin-left: 100%; }
+}

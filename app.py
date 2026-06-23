@@ -139,6 +139,7 @@ def create_app():
 
         # 删除 DB 记录后，worker 各检查点（转写前/diarize 前/写库前）会检测到
         # File 已不存在而跳过，无需额外取消标记（避免 id 复用误杀新文件）
+        was_processing = file_record.status == 'processing'
 
         disk_path = os.path.join(app.config['UPLOAD_FOLDER'], file_record.stored_path)
         if os.path.exists(disk_path):
@@ -146,6 +147,11 @@ def create_app():
 
         db.session.delete(file_record)
         db.session.commit()
+
+        # 若删除的是正在转写的文件，带 terminating 标记重定向，
+        # 前端据此显示"终止中"提示（大音频逐段中断有延迟）
+        if was_processing:
+            return redirect(url_for('index', terminating=file_id))
 
         flash(f'「{file_record.filename}」已删除', 'info')
         return redirect(url_for('index'))
@@ -174,6 +180,18 @@ def create_app():
             'segment_count': file_record.segments.count(),
             'created_at': file_record.formatted_created_at,
             'transcribed_at': file_record.formatted_transcribed_at,
+        })
+
+    # ============================================================
+    # API：worker 当前任务（供前端"终止中"提示轮询）
+    # ============================================================
+    @app.route('/api/worker/status')
+    def api_worker_status():
+        from worker import get_current_progress
+        current_file_id, _ = get_current_progress()
+        return jsonify({
+            'current_file_id': current_file_id,
+            'busy': current_file_id is not None,
         })
 
     # ============================================================

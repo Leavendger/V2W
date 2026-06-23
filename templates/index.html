@@ -204,5 +204,53 @@
         setTimeout(poll, 2000);
     })();
 })();
+
+// ============================================================
+// 删除正在转写的文件后：右下角显示"终止中"提示
+// （大音频逐段中断有延迟，提示用户后台正在关闭旧任务）
+// ============================================================
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var terminating = params.get('terminating');
+    if (!terminating) return;
+    // 清掉 URL 参数，避免刷新重复触发
+    history.replaceState(null, '', window.location.pathname);
+
+    var toast = document.createElement('div');
+    toast.className = 'terminate-toast';
+    toast.innerHTML =
+        '<div class="terminate-header">' +
+          '<span class="terminate-icon">⏳</span>' +
+          '<span class="terminate-text">正在终止之前的转写任务…</span>' +
+        '</div>' +
+        '<div class="terminate-progress"><div class="terminate-progress-bar"></div></div>';
+    document.body.appendChild(toast);
+    var textEl = toast.querySelector('.terminate-text');
+    var iconEl = toast.querySelector('.terminate-icon');
+
+    function finish() {
+        textEl.textContent = '之前的转写任务已关闭';
+        iconEl.textContent = '✅';
+        toast.classList.add('terminate-done');
+        setTimeout(function() {
+            toast.classList.add('terminate-hide');
+            setTimeout(function() { toast.remove(); }, 300);
+        }, 3000);
+    }
+    function poll() {
+        fetch('/api/worker/status')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                // worker 不再处理被删文件（已中断，转 idle 或下一个任务）→ 完成
+                if (data.current_file_id === null || data.current_file_id !== Number(terminating)) {
+                    finish();
+                } else {
+                    setTimeout(poll, 1000);
+                }
+            })
+            .catch(function() { setTimeout(poll, 2000); });
+    }
+    setTimeout(poll, 500);
+})();
 </script>
 {% endblock %}
