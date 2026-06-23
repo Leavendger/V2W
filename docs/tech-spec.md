@@ -102,6 +102,10 @@ V2W/
 | GET | `/api/file/<int:id>/segments` | application/json | 返回转写段落数组 |
 | POST | `/file/<int:id>/delete` | — | 删除文件及转写数据 |
 | GET | `/uploads/<path>` | — | 静态文件服务 |
+| GET | `/api/file/<int:id>/search` | application/json | 单文件内搜索转写段落（迭代 P6） |
+| GET | `/search` | text/html | 全局跨文件搜索结果页（迭代 P7） |
+
+> **全文搜索**基于现有 `transcript_segments` 表用 `LIKE` 子串匹配实现（中文友好、零额外 schema），数据量增长后可平滑升级至 SQLite FTS5。详见 [docs/search-design.md](search-design.md)。
 
 ## 6. 转写处理流程
 

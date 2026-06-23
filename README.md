@@ -118,7 +118,8 @@ V2W/
 │   ├── requirements.md   # 产品需求文档
 │   ├── tech-spec.md      # 技术规范
 │   ├── design-spec.md    # UI 设计规范
-│   └── execution-plan.md # 分阶段执行计划
+│   ├── execution-plan.md # 分阶段执行计划
+│   └── search-design.md  # 全文搜索详细设计
 ├── dev_logs/             # 开发日志
 └── README.md
 ```
@@ -145,7 +146,7 @@ V2W/
 - [ ] 说话人分离（pyannote.audio，区分发言人 A/B）
 - [ ] AI 自动总结（生成会议摘要）
 - [ ] 关键词与待办事项提取
-- [ ] 全文搜索
+- [ ] 全文搜索（[设计](docs/search-design.md) · 分两阶段：单文件内 P6 → 全局 P7）
 - [ ] 导出功能（Word / SRT / Markdown）
 
 ### 远期规划
