@@ -78,7 +78,22 @@
 
     <!-- 转写文字区 -->
     <div class="transcript-section" id="transcript-section">
-        <h2 class="transcript-title">📝 转写内容</h2>
+        <div class="transcript-header">
+            <h2 class="transcript-title">📝 转写内容</h2>
+            {% if file.status == 'completed' and segments %}
+            <div class="search-bar" id="search-bar">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="search-input" class="search-input"
+                       placeholder="搜索转写内容…" autocomplete="off" spellcheck="false">
+                <span class="search-nav" id="search-nav" hidden>
+                    <button type="button" class="search-btn" id="search-prev" title="上一个 (Shift+Enter)">↑</button>
+                    <button type="button" class="search-btn" id="search-next" title="下一个 (Enter)">↓</button>
+                </span>
+                <span class="search-count" id="search-count" hidden>0/0</span>
+                <button type="button" class="search-clear" id="search-clear" title="清除 (Esc)" hidden>✕</button>
+            </div>
+            {% endif %}
+        </div>
 
         {% if file.status == 'completed' and segments %}
         <div class="segments-list" id="segments-list">
@@ -148,6 +163,7 @@
     if (!player || items.length === 0) return;
 
     var currentActive = null;
+    var searchActive = false;   // 搜索激活期间，暂停播放的自动滚动跟随
 
     // ---------- 点击段落 → 跳转播放 ----------
     items.forEach(function(item) {
@@ -178,7 +194,9 @@
             if (currentActive) currentActive.classList.remove('active');
             if (found) {
                 found.classList.add('active');
-                found.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                if (!searchActive) {                       // 搜索激活时不抢滚动
+                    found.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
             }
             currentActive = found;
         }
@@ -204,6 +222,157 @@
                 break;
         }
     });
+
+    // ============================================================
+    // 全文搜索（迭代 P6）
+    // ============================================================
+    var searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        var hits = [];           // 命中的 segment-item（按文档序）
+        var currentHit = -1;
+        var origText = new Map();
+        items.forEach(function(item) {
+            var t = item.querySelector('.segment-text');
+            if (t) origText.set(item, t.textContent);
+        });
+
+        function esc(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // 关键词高亮（大小写不敏感），返回带 <mark> 的安全 HTML
+        function highlight(text, q) {
+            var ql = q.toLowerCase(), tl = text.toLowerCase();
+            var out = '', last = 0, idx = tl.indexOf(ql);
+            while (idx !== -1) {
+                out += esc(text.slice(last, idx))
+                     + '<mark>' + esc(text.slice(idx, idx + q.length)) + '</mark>';
+                last = idx + q.length;
+                idx = tl.indexOf(ql, last);
+            }
+            return out + esc(text.slice(last));
+        }
+
+        function applyHighlight(q) {
+            origText.forEach(function(text, item) {
+                var t = item.querySelector('.segment-text');
+                if (t) t.innerHTML = highlight(text, q);
+            });
+        }
+
+        function clearHighlight() {
+            origText.forEach(function(text, item) {
+                item.classList.remove('search-hit', 'search-current');
+                var t = item.querySelector('.segment-text');
+                if (t) t.textContent = text;
+            });
+        }
+
+        function updateCount() {
+            var countEl = document.getElementById('search-count');
+            if (countEl) {
+                countEl.textContent = hits.length ? (currentHit + 1) + '/' + hits.length : '0/0';
+            }
+        }
+
+        function setCurrent(i) {
+            if (currentHit >= 0 && hits[currentHit]) {
+                hits[currentHit].classList.remove('search-current');
+            }
+            currentHit = i;
+            if (hits[currentHit]) {
+                hits[currentHit].classList.add('search-current');
+                hits[currentHit].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            updateCount();
+        }
+
+        function toggleControls(on) {
+            ['search-nav', 'search-count', 'search-clear'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.hidden = !on;
+            });
+        }
+
+        var searchTimer = null;
+        function doSearch(q) {
+            clearHighlight();
+            hits = [];
+            currentHit = -1;
+
+            if (!q) {
+                searchActive = false;
+                toggleControls(false);
+                updateCount();
+                return;
+            }
+
+            searchActive = true;                       // 输入期间即暂停播放自动滚动
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function() {
+                fetch('/api/file/{{ file.id }}/search?q=' + encodeURIComponent(q))
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        clearHighlight();              // 防抖期间段落可能变化，重新清理
+                        applyHighlight(q);
+                        var indexMap = {};
+                        items.forEach(function(item) {
+                            indexMap[item.getAttribute('data-index')] = item;
+                        });
+                        (data.hits || []).forEach(function(h) {
+                            var it = indexMap[h.segment_index];
+                            if (it) { it.classList.add('search-hit'); hits.push(it); }
+                        });
+                        searchActive = hits.length > 0;
+                        toggleControls(hits.length > 0);
+                        updateCount();
+                        if (hits.length) setCurrent(0);
+                    })
+                    .catch(function() {});
+            }, 300);
+        }
+
+        searchInput.addEventListener('input', function() {
+            doSearch(searchInput.value.trim());
+        });
+
+        // 回车下一个 / Shift+回车上一个；Esc 清除
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (!hits.length) return;
+                var delta = e.shiftKey ? -1 : 1;
+                setCurrent((currentHit + delta + hits.length) % hits.length);
+            } else if (e.key === 'Escape') {
+                searchInput.value = '';
+                doSearch('');
+                searchInput.blur();
+            }
+        });
+
+        var prevBtn = document.getElementById('search-prev');
+        var nextBtn = document.getElementById('search-next');
+        var clrBtn = document.getElementById('search-clear');
+        if (prevBtn) prevBtn.addEventListener('click', function() {
+            if (hits.length) setCurrent((currentHit - 1 + hits.length) % hits.length);
+        });
+        if (nextBtn) nextBtn.addEventListener('click', function() {
+            if (hits.length) setCurrent((currentHit + 1) % hits.length);
+        });
+        if (clrBtn) clrBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            doSearch('');
+            searchInput.focus();
+        });
+
+        // P7 深链支持：URL 带 ?q= 时自动填入并搜索
+        var urlQ = new URLSearchParams(window.location.search).get('q');
+        if (urlQ) {
+            searchInput.value = urlQ;
+            doSearch(urlQ);
+        }
+    }
 })();
 </script>
 {% endblock %}

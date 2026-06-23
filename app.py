@@ -134,6 +134,39 @@ def create_app():
         return jsonify([s.to_dict() for s in segments])
 
     # ============================================================
+    # API：单文件内全文搜索（迭代 P6）
+    # ============================================================
+    @app.route('/api/file/<int:file_id>/search')
+    def api_file_search(file_id):
+        from models import TranscriptSegment
+        from utils import escape_like
+        from sqlalchemy import func
+
+        q = (request.args.get('q') or '').strip()
+        if not q:
+            return jsonify({'query': '', 'total': 0, 'hits': []})
+
+        file_record = File.query.get_or_404(file_id)
+        if file_record.status != 'completed':
+            return jsonify({'query': q, 'total': 0, 'hits': []})
+
+        # 大小写不敏感的子串匹配；escape_like 转义通配符，按字面匹配
+        kw = '%' + escape_like(q.lower()) + '%'
+        results = (TranscriptSegment.query
+                   .filter(TranscriptSegment.file_id == file_id)
+                   .filter(func.lower(TranscriptSegment.text).like(kw, escape='\\'))
+                   .order_by(TranscriptSegment.segment_index)
+                   .all())
+
+        hits = [{
+            'segment_index': r.segment_index,
+            'start_time': r.start_time,
+            'end_time': r.end_time,
+            'text': r.text,
+        } for r in results]
+        return jsonify({'query': q, 'total': len(hits), 'hits': hits})
+
+    # ============================================================
     # 路由：上传文件访问
     # ============================================================
     @app.route('/uploads/<path:filename>')

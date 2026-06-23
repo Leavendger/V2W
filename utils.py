@@ -56,3 +56,14 @@ def format_duration(seconds):
     if h > 0:
         return f'{h}:{m:02d}:{s:02d}'
     return f'{m:02d}:{s:02d}'
+
+
+def escape_like(keyword):
+    """转义 SQL LIKE 的通配符，使其按字面匹配。
+
+    用于全文搜索：用户输入的 % _ \\ 不会被当作通配符。
+    """
+    return (keyword
+            .replace('\\', '\\\\')
+            .replace('%', '\\%')
+            .replace('_', '\\_'))
