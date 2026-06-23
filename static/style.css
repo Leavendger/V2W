@@ -553,6 +553,32 @@ button { cursor: pointer; font-family: inherit; }
 
 .detail-meta { font-size: 13px; color: var(--text-secondary); }
 
+.detail-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 16px;
+    background: var(--bg-card);
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+
+.export-btn:hover {
+    background: var(--primary);
+    color: #fff;
+}
+
 .detail-times {
     display: flex;
     gap: 16px;

@@ -174,6 +174,32 @@ def create_app():
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
     # ============================================================
+    # 路由：导出转写内容为 Markdown
+    # ============================================================
+    @app.route('/file/<int:file_id>/export')
+    def export_file(file_id):
+        from flask import Response
+        from urllib.parse import quote
+        from utils import segments_to_markdown
+
+        file_record = File.query.get_or_404(file_id)
+        if file_record.status != 'completed':
+            flash('文件尚未转写完成，暂无法导出', 'error')
+            return redirect(url_for('file_detail', file_id=file_id))
+
+        md_content = segments_to_markdown(file_record, file_record.segments.all())
+
+        # 下载文件名：原文件名去扩展名 + .md；中文按 RFC 5987 编码
+        base = os.path.splitext(file_record.filename)[0]
+        encoded = quote(f"{base}.md")
+
+        response = Response(md_content, mimetype='text/markdown')
+        response.headers['Content-Disposition'] = (
+            f"attachment; filename=\"export.md\"; filename*=UTF-8''{encoded}"
+        )
+        return response
+
+    # ============================================================
     # 路由：全局搜索（项目名 + 转写文字，三类 Tab）
     # ============================================================
     @app.route('/search')

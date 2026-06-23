@@ -43,7 +43,14 @@
                 </div>
             </div>
         </div>
-        <span class="status-badge status-{{ file.status }}">{{ file.status_label }}</span>
+        <div class="detail-header-actions">
+            {% if file.status == 'completed' %}
+            <a href="{{ url_for('export_file', file_id=file.id) }}" class="export-btn" title="导出为 Markdown">
+                ⬇ 导出 Markdown
+            </a>
+            {% endif %}
+            <span class="status-badge status-{{ file.status }}">{{ file.status_label }}</span>
+        </div>
     </div>
 
     <!-- 非音频的播放器区域（音频已移到 sticky bar） -->

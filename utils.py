@@ -67,3 +67,43 @@ def escape_like(keyword):
             .replace('\\', '\\\\')
             .replace('%', '\\%')
             .replace('_', '\\_'))
+
+
+def speaker_label(seg):
+    """返回段落说话人标签。
+
+    当前未接入说话人分离，统一占位为「发言人」。
+    将来 TranscriptSegment 增加 speaker 字段后，仅在此处读取真实说话人即可，
+    导出格式无需变动。
+    """
+    return '发言人'
+
+
+def segments_to_markdown(file_record, segments):
+    """将转写段落导出为 Markdown 文本。
+
+    结构：# 文件名标题 + 元信息（时长/转写时间）+ 每段「说话人 tag · 时间戳 + 文字」。
+    """
+    lines = []
+    lines.append(f"# {file_record.filename}")
+    lines.append("")
+
+    meta = []
+    if file_record.duration:
+        meta.append(f"⏱ 时长 {format_duration(file_record.duration)}")
+    if file_record.transcribed_at:
+        meta.append(f"✅ 转写完成 {file_record.transcribed_at.strftime('%Y-%m-%d %H:%M')}")
+    if meta:
+        lines.append("> " + " · ".join(meta))
+        lines.append("")
+
+    lines.append("---")
+    lines.append("")
+
+    for seg in segments:
+        lines.append(f"**[{speaker_label(seg)}]** `{format_duration(seg.start_time)}`")
+        lines.append("")
+        lines.append(seg.text)
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
