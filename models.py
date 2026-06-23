@@ -8,6 +8,7 @@ db = SQLAlchemy()
 class File(db.Model):
     """上传的音视频文件"""
     __tablename__ = 'files'
+    __table_args__ = {'sqlite_autoincrement': True}  # id 严格自增，删除后不复用
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     filename = db.Column(db.String(256), nullable=False)

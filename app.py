@@ -36,6 +36,37 @@ def create_app():
                 'ALTER TABLE files ADD COLUMN diarize BOOLEAN DEFAULT 0'))
             logger.info('Migrated: added files.diarize')
         db.session.commit()
+
+        # 迁移：files.id 改为 AUTOINCREMENT（删除后 id 不复用，避免 worker 误判取消）
+        _files_sql = db.session.execute(sa_text(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='files'"
+        )).scalar()
+        if _files_sql and 'AUTOINCREMENT' not in _files_sql:
+            logger.info('Migrating files table: add AUTOINCREMENT (id 不复用)')
+            db.session.execute(sa_text(
+                'CREATE TABLE files_new ('
+                'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+                'filename VARCHAR(256) NOT NULL, '
+                'stored_path VARCHAR(512) NOT NULL, '
+                'file_type VARCHAR(16) NOT NULL, '
+                'file_size INTEGER NOT NULL, '
+                "status VARCHAR(32) DEFAULT 'uploaded', "
+                'duration FLOAT, '
+                'error_message TEXT, '
+                'created_at DATETIME, '
+                'transcribed_at DATETIME, '
+                'diarize BOOLEAN DEFAULT 0)'
+            ))
+            db.session.execute(sa_text(
+                'INSERT INTO files_new (id, filename, stored_path, file_type, file_size, '
+                'status, duration, error_message, created_at, transcribed_at, diarize) '
+                'SELECT id, filename, stored_path, file_type, file_size, '
+                'status, duration, error_message, created_at, transcribed_at, diarize FROM files'
+            ))
+            db.session.execute(sa_text('DROP TABLE files'))
+            db.session.execute(sa_text('ALTER TABLE files_new RENAME TO files'))
+            db.session.commit()
+            logger.info('Migrated: files.id now AUTOINCREMENT (id 不再复用)')
         # 启用 WAL 模式（提高并发性能）
         from sqlalchemy import text
         db.session.execute(text('PRAGMA journal_mode=WAL'))
