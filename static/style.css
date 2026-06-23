@@ -230,17 +230,35 @@ button { cursor: pointer; font-family: inherit; }
 
 .header-right { display: flex; align-items: center; gap: 14px; }
 
-.diarize-toggle {
+.diarize-segment {
     display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    user-select: none;
+    background: var(--border-light);
+    border-radius: 20px;
+    padding: 3px;
+    gap: 2px;
 }
 
-.diarize-toggle input { cursor: pointer; accent-color: var(--primary); }
+.seg-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 17px;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+
+.seg-btn:hover { color: var(--primary); }
+
+.seg-btn.active {
+    background: var(--bg-card);
+    color: var(--primary);
+    font-weight: 600;
+    box-shadow: var(--shadow);
+}
 
 .header-left h1 {
     font-size: 26px;

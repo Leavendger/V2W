@@ -9,10 +9,12 @@
         <span class="file-count">{{ files|length }} 个文件</span>
     </div>
     <div class="header-right">
-        <label class="diarize-toggle" id="diarize-toggle-label">
-            <input type="checkbox" id="diarize-toggle" checked>
-            <span>识别说话人</span>
-        </label>
+        <div class="diarize-segment" id="diarize-segment">
+            <button type="button" class="seg-btn active" data-diarize="1"
+                    title="区分说话人（说话人 1/2/3），转译较慢">👤 识别说话人</button>
+            <button type="button" class="seg-btn" data-diarize="0"
+                    title="不区分说话人，转译较快">⚡ 快速转写</button>
+        </div>
         <label for="upload-input" class="upload-btn">+ 上传文件</label>
     </div>
 </div>
@@ -74,21 +76,19 @@
     var uploadInput = document.getElementById('upload-input');
     var dropOverlay = document.getElementById('drop-overlay');
 
-    // 说话人勾选：submit 前同步到 hidden flag + hover 提示随勾选状态变化
-    var diarizeToggle = document.getElementById('diarize-toggle');
+    // 转写模式切换（识别说话人 / 快速转写）+ 同步 hidden flag
     var diarizeFlag = document.getElementById('diarize-flag');
-    var diarizeLabel = document.getElementById('diarize-toggle-label');
-    function updateDiarizeHint() {
-        if (!diarizeLabel) return;
-        diarizeLabel.title = diarizeToggle.checked
-            ? '✅ 已勾选：将区分说话人（说话人 1/2/3），转译较慢'
-            : '⬜ 未勾选：不区分说话人，转译较快';
-    }
-    updateDiarizeHint();
-    if (diarizeToggle) diarizeToggle.addEventListener('change', updateDiarizeHint);
-    uploadForm.addEventListener('submit', function() {
-        diarizeFlag.value = (diarizeToggle && diarizeToggle.checked) ? '1' : '';
+    var segBtns = document.querySelectorAll('.seg-btn');
+    segBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            segBtns.forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            diarizeFlag.value = btn.getAttribute('data-diarize');
+        });
     });
+    // 初始同步（默认识别说话人）
+    var _activeSeg = document.querySelector('.seg-btn.active');
+    if (_activeSeg && diarizeFlag) diarizeFlag.value = _activeSeg.getAttribute('data-diarize');
     var mainContainer = document.getElementById('main-container');
     var dragCounter = 0;  // 处理子元素 dragenter/leave 冒泡
 
