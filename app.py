@@ -106,9 +106,8 @@ def create_app():
     def delete_file(file_id):
         file_record = File.query.get_or_404(file_id)
 
-        # 取消正在进行的转写任务（避免幽灵任务阻塞队列）
-        from worker import cancel_file
-        cancel_file(file_id)
+        # 删除 DB 记录后，worker 各检查点（转写前/diarize 前/写库前）会检测到
+        # File 已不存在而跳过，无需额外取消标记（避免 id 复用误杀新文件）
 
         disk_path = os.path.join(app.config['UPLOAD_FOLDER'], file_record.stored_path)
         if os.path.exists(disk_path):

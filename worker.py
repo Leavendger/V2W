@@ -64,31 +64,6 @@ def enqueue_file(file_id):
     logger.info(f'File {file_id} enqueued (queue size={_queue.qsize()})')
 
 
-# 被取消的 file_id 集合（删除文件时标记，worker 在检查点跳过）
-_cancelled = set()
-
-
-def cancel_file(file_id):
-    """标记文件转写任务取消（删除文件时调用）。
-
-    排队中的任务：取出后立即跳过；
-    处理中的任务：在下一个检查点（转写前 / diarize 前 / 写库前）跳过。
-    注意：Whisper / pyannote 推理是阻塞调用，一旦开始需等本次跑完。
-    """
-    with _lock:
-        _cancelled.add(file_id)
-    logger.info(f'File {file_id} cancel requested')
-
-
-def _is_cancelled(file_id):
-    """检查并消费取消标志（命中则移除）"""
-    with _lock:
-        if file_id in _cancelled:
-            _cancelled.discard(file_id)
-            return True
-        return False
-
-
 def start_worker(app):
     """
     启动后台转写线程。
@@ -119,13 +94,6 @@ def _worker_loop(app):
         with _lock:
             _current_task = file_id
 
-        # 检查点 A：取出即取消（排队期间被删除）
-        if _is_cancelled(file_id):
-            logger.info(f'File {file_id} cancelled on dequeue, skipping')
-            with _lock:
-                _current_task = None
-            continue
-
         logger.info(f'Worker: processing file {file_id}')
 
         with app.app_context():
@@ -152,9 +120,9 @@ def _worker_loop(app):
                     logger.info(f'Extracting audio from video: {stored_path}')
                     extract_audio(stored_path, audio_path)
 
-                # 检查点 B：转写前取消/删除（跳过最耗时的 Whisper 推理）
-                if _is_cancelled(file_id) or File.query.get(file_id) is None:
-                    logger.info(f'File {file_id} cancelled/deleted before transcription, skipping')
+                # 检查点 B：转写前检查文件是否已被删除（跳过最耗时的 Whisper 推理）
+                if File.query.get(file_id) is None:
+                    logger.info(f'File {file_id} deleted before transcription, skipping')
                     if file_record.file_type == 'video' and os.path.exists(audio_path):
                         os.remove(audio_path)
                     continue
@@ -171,9 +139,9 @@ def _worker_loop(app):
                 # 3.5 说话人分离（按需：文件勾选 + 全局开关 + token）
                 speakers_assigned = False
                 if file_record.diarize and app.config.get('DIARIZATION_ENABLED'):
-                    # 检查点 C：diarize 前取消/删除（跳过较慢的分离）
-                    if _is_cancelled(file_id) or File.query.get(file_id) is None:
-                        logger.info(f'File {file_id} cancelled/deleted before diarization')
+                    # 检查点 C：diarize 前检查文件是否已被删除（跳过较慢的分离）
+                    if File.query.get(file_id) is None:
+                        logger.info(f'File {file_id} deleted before diarization')
                     else:
                         try:
                             from diarizer import diarize, assign_speakers
@@ -187,9 +155,9 @@ def _worker_loop(app):
                             # 优雅降级：分离失败不影响转写，段落 speaker 留空
                             logger.warning(f'Diarization failed for file {file_id}, skipping: {de}')
 
-                # 检查点 D：写库前取消/删除（不写入幽灵段落）
-                if _is_cancelled(file_id) or File.query.get(file_id) is None:
-                    logger.info(f'File {file_id} cancelled/deleted before writing, skipping')
+                # 检查点 D：写库前检查文件是否已被删除（不写入幽灵段落）
+                if File.query.get(file_id) is None:
+                    logger.info(f'File {file_id} deleted before writing, skipping')
                     if file_record.file_type == 'video' and os.path.exists(audio_path):
                         os.remove(audio_path)
                     continue
