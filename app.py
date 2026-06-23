@@ -106,6 +106,10 @@ def create_app():
     def delete_file(file_id):
         file_record = File.query.get_or_404(file_id)
 
+        # 取消正在进行的转写任务（避免幽灵任务阻塞队列）
+        from worker import cancel_file
+        cancel_file(file_id)
+
         disk_path = os.path.join(app.config['UPLOAD_FOLDER'], file_record.stored_path)
         if os.path.exists(disk_path):
             os.remove(disk_path)
