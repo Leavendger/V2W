@@ -58,6 +58,19 @@ def get_current_progress():
         return _current_task, 0
 
 
+def _is_file_deleted(session, file_id):
+    """直接查 DB 判断文件是否已删除。
+
+    绕过 SQLAlchemy session 缓存：worker 开头的 File.query.get(file_id) 会把
+    file 对象缓存进本 session，之后即使别处（删除路由）删了记录，本 session 的
+    File.query.get 仍返回缓存对象 → 永不为 None。用原始 SQL 直查才实时。
+    """
+    from sqlalchemy import text
+    return session.execute(
+        text('SELECT 1 FROM files WHERE id = :id'), {'id': file_id}
+    ).first() is None
+
+
 def enqueue_file(file_id):
     """将文件加入转写队列"""
     _queue.put(file_id)
@@ -121,7 +134,7 @@ def _worker_loop(app):
                     extract_audio(stored_path, audio_path)
 
                 # 检查点 B：转写前检查文件是否已被删除（跳过最耗时的 Whisper 推理）
-                if File.query.get(file_id) is None:
+                if _is_file_deleted(db.session, file_id):
                     logger.info(f'File {file_id} deleted before transcription, skipping')
                     if file_record.file_type == 'video' and os.path.exists(audio_path):
                         os.remove(audio_path)
@@ -138,7 +151,7 @@ def _worker_loop(app):
                 segments = []
                 aborted = False
                 for seg in seg_gen:
-                    if File.query.get(file_id) is None:
+                    if _is_file_deleted(db.session, file_id):
                         logger.info(f'File {file_id} deleted during transcription, aborting')
                         aborted = True
                         break
@@ -152,7 +165,7 @@ def _worker_loop(app):
                 speakers_assigned = False
                 if file_record.diarize and app.config.get('DIARIZATION_ENABLED'):
                     # 检查点 C：diarize 前检查文件是否已被删除（跳过较慢的分离）
-                    if File.query.get(file_id) is None:
+                    if _is_file_deleted(db.session, file_id):
                         logger.info(f'File {file_id} deleted before diarization')
                     else:
                         try:
@@ -168,7 +181,7 @@ def _worker_loop(app):
                             logger.warning(f'Diarization failed for file {file_id}, skipping: {de}')
 
                 # 检查点 D：写库前检查文件是否已被删除（不写入幽灵段落）
-                if File.query.get(file_id) is None:
+                if _is_file_deleted(db.session, file_id):
                     logger.info(f'File {file_id} deleted before writing, skipping')
                     if file_record.file_type == 'video' and os.path.exists(audio_path):
                         os.remove(audio_path)
