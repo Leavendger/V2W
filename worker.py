@@ -214,9 +214,20 @@ def _worker_loop(app):
 
             except Exception as e:
                 logger.error(f'File {file_id} failed: {e}', exc_info=True)
-                file_record.status = 'failed'
-                file_record.error_message = str(e)[:500]
-                _db_commit_with_retry(db.session)
+                # 文件可能已被删除（用户删除时 worker 正在处理）：file_record 已不在 DB，
+                # 再 commit 会抛 StaleDataError 且无法被本 except 捕获 → worker 线程崩溃 →
+                # 队列永久卡死。因此先检查文件是否还在 DB，不在则跳过状态更新，保证 worker 存活。
+                if not _is_file_deleted(db.session, file_id):
+                    try:
+                        file_record.status = 'failed'
+                        file_record.error_message = str(e)[:500]
+                        _db_commit_with_retry(db.session)
+                    except Exception as ce:
+                        logger.warning(f'Failed to mark file {file_id} as failed: {ce}')
+                        db.session.rollback()
+                else:
+                    logger.info(f'File {file_id} deleted during processing, skip marking failed')
+                    db.session.rollback()
 
                 # 清理可能的临时文件
                 if file_record.file_type == 'video':
