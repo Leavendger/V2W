@@ -104,6 +104,7 @@ V2W/
 | GET | `/uploads/<path>` | — | 静态文件服务 |
 | GET | `/api/file/<int:id>/search` | application/json | 单文件内搜索转写段落（迭代 P6） |
 | GET | `/search` | text/html | 全局搜索（项目名 + 转写文字），支持 `?tab=all\|name\|content`（迭代 P7） |
+| GET | `/file/<int:id>/export` | text/markdown | 导出转写内容为 Markdown（迭代 P8） |
 
 > **全文搜索**基于现有 `transcript_segments`（转写文字）与 `files.filename`（项目名）用 `LIKE` 子串匹配实现（中文友好、零额外 schema），结果分「全部 / 项目名 / 转文字」三类 Tab。数据量增长后可平滑升级至 SQLite FTS5。详见 [docs/search-design.md](search-design.md)。
 
