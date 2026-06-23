@@ -146,7 +146,7 @@ V2W/
 - [ ] 说话人分离（pyannote.audio，区分发言人 A/B）
 - [ ] AI 自动总结（生成会议摘要）
 - [ ] 关键词与待办事项提取
-- [ ] 全文搜索（[设计](docs/search-design.md) · 分两阶段：单文件内 P6 → 全局 P7）
+- [x] 全文搜索（[设计](docs/search-design.md) · 单文件内 P6 + 全局 P7，含项目名检索与「全部/项目名/转文字」三类 Tab）
 - [ ] 导出功能（Word / SRT / Markdown）
 
 ### 远期规划
