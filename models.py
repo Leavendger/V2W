@@ -19,6 +19,7 @@ class File(db.Model):
     error_message = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.now)       # 上传完成时间
     transcribed_at = db.Column(db.DateTime, nullable=True)             # 转写完成时间
+    diarize = db.Column(db.Boolean, default=False)                     # 是否对该文件做说话人分离（P9）
 
     # 关联
     segments = db.relationship(
@@ -81,6 +82,7 @@ class TranscriptSegment(db.Model):
     end_time = db.Column(db.Float, nullable=False)       # 结束时间（秒）
     text = db.Column(db.Text, nullable=False)             # 转写文字
     segment_index = db.Column(db.Integer, nullable=False) # 排序索引
+    speaker = db.Column(db.String(32), nullable=True)     # 说话人标签（P9，如 SPEAKER_00；NULL 未识别）
 
     def to_dict(self):
         return {
@@ -90,7 +92,18 @@ class TranscriptSegment(db.Model):
             'end_time': self.end_time,
             'text': self.text,
             'segment_index': self.segment_index,
+            'speaker': self.speaker,
         }
+
+    @property
+    def speaker_display(self):
+        """说话人友好标签（说话人 N）。未识别返回空串。"""
+        if not self.speaker:
+            return ''
+        try:
+            return f'说话人 {int(self.speaker.split("_")[-1]) + 1}'
+        except (ValueError, AttributeError):
+            return self.speaker
 
     @property
     def formatted_time(self):

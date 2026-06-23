@@ -4,6 +4,25 @@ import os
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 
+def _load_env_file():
+    """从本地 .env 文件加载键值对（.env 不入 git，存放 HF_TOKEN 等本地密钥）"""
+    env_path = os.path.join(BASE_DIR, '.env')
+    if not os.path.exists(env_path):
+        return {}
+    result = {}
+    with open(env_path, encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            result[key.strip()] = value.strip().strip('"').strip("'")
+    return result
+
+
+_LOCAL_ENV = _load_env_file()
+
+
 class Config:
     """基础配置"""
     # 开发环境使用默认值；生产环境请设置环境变量 SECRET_KEY
@@ -44,3 +63,9 @@ class Config:
     WHISPER_MODEL_SIZE = 'medium'      # tiny / base / small / medium / large
     WHISPER_DEVICE = 'auto'           # auto / cpu / cuda
     WHISPER_COMPUTE_TYPE = 'auto'     # auto 自动选最优（CPU=int8, GPU=float16）
+
+    # 说话人分离（迭代 P9）
+    # 全局总开关：是否允许「识别说话人」。False 时即使上传勾选也不跑。
+    DIARIZATION_ENABLED = os.environ.get('DIARIZATION_ENABLED', 'true').lower() == 'true'
+    # HuggingFace token：环境变量优先，回退本地 .env（配置见 docs/hf-token-setup.md）
+    HF_TOKEN = os.environ.get('HF_TOKEN') or _LOCAL_ENV.get('HF_TOKEN')

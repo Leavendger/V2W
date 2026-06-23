@@ -1,3 +1,10 @@
 flask>=3.0
 flask-sqlalchemy>=3.0
 faster-whisper>=1.0
+# 说话人分离黄金组合（pyannote 3.1.1 需 torch 2.0 / torchaudio 2.0 / numpy<2 / hf_hub<0.20）
+numpy<2
+huggingface_hub<0.20
+torch==2.0.1
+torchaudio==2.0.2
+pyannote.audio==3.1.1
+setuptools<70  # lightning_fabric 依赖 pkg_resources（setuptools 80+ 已移除）

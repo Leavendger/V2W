@@ -24,6 +24,18 @@ def create_app():
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        # 轻量迁移：为已有表补新列（create_all 不改已存在表，P9）
+        from sqlalchemy import inspect as sa_inspect, text as sa_text
+        _inspector = sa_inspect(db.engine)
+        if 'speaker' not in [c['name'] for c in _inspector.get_columns('transcript_segments')]:
+            db.session.execute(sa_text(
+                'ALTER TABLE transcript_segments ADD COLUMN speaker VARCHAR(32)'))
+            logger.info('Migrated: added transcript_segments.speaker')
+        if 'diarize' not in [c['name'] for c in _inspector.get_columns('files')]:
+            db.session.execute(sa_text(
+                'ALTER TABLE files ADD COLUMN diarize BOOLEAN DEFAULT 0'))
+            logger.info('Migrated: added files.diarize')
+        db.session.commit()
         # 启用 WAL 模式（提高并发性能）
         from sqlalchemy import text
         db.session.execute(text('PRAGMA journal_mode=WAL'))
@@ -64,12 +76,15 @@ def create_app():
         file.save(stored_path)
 
         # 写入数据库
+        diarize_requested = (request.form.get('diarize') == '1'
+                             and app.config.get('DIARIZATION_ENABLED'))
         file_record = File(
             filename=file.filename,
             stored_path=stored_name,
             file_type=file_type,
             file_size=os.path.getsize(stored_path),
             status='uploaded',
+            diarize=diarize_requested,
         )
         db.session.add(file_record)
         db.session.commit()
@@ -78,7 +93,10 @@ def create_app():
         from worker import enqueue_file
         enqueue_file(file_record.id)
 
-        flash(f'「{file.filename}」上传成功，已加入转写队列', 'success')
+        msg = f'「{file.filename}」上传成功，已加入转写队列'
+        if diarize_requested:
+            msg += '（含说话人识别，耗时较长）'
+        flash(msg, 'success')
         return redirect(url_for('index'))
 
     # ============================================================

@@ -228,6 +228,20 @@ button { cursor: pointer; font-family: inherit; }
 
 .header-left { display: flex; align-items: baseline; gap: 12px; }
 
+.header-right { display: flex; align-items: center; gap: 14px; }
+
+.diarize-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.diarize-toggle input { cursor: pointer; accent-color: var(--primary); }
+
 .header-left h1 {
     font-size: 26px;
     font-weight: 700;
@@ -760,6 +774,18 @@ button { cursor: pointer; font-family: inherit; }
     font-size: 15px;
     line-height: 1.65;
     color: var(--text-primary);
+}
+
+.segment-speaker {
+    display: inline-block;
+    background: var(--primary-light);
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 10px;
+    margin-right: 8px;
+    vertical-align: middle;
 }
 
 /* 快捷键提示 */

@@ -108,7 +108,10 @@
             <div class="segment-item" data-start="{{ seg.start_time }}" data-end="{{ seg.end_time }}"
                  data-index="{{ seg.segment_index }}">
                 <span class="segment-time">{{ seg.formatted_time }}</span>
-                <span class="segment-text">{{ seg.text }}</span>
+                <span class="segment-text">
+                    {% if seg.speaker %}<span class="segment-speaker">{{ seg.speaker_display }}</span>{% endif %}
+                    {{ seg.text }}
+                </span>
             </div>
             {% endfor %}
         </div>

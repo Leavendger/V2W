@@ -46,8 +46,8 @@ def format_file_size(bytes_size):
 
 
 def format_duration(seconds):
-    """格式化时长（秒 → mm:ss 或 hh:mm:ss）"""
-    if not seconds:
+    """格式化时长（秒 → mm:ss 或 hh:mm:ss）。None 返回占位 '--:--'。"""
+    if seconds is None:
         return '--:--'
     seconds = int(seconds)
     h = seconds // 3600
@@ -70,13 +70,17 @@ def escape_like(keyword):
 
 
 def speaker_label(seg):
-    """返回段落说话人标签。
+    """返回段落说话人友好标签。未识别返回占位「发言人」。
 
-    当前未接入说话人分离，统一占位为「发言人」。
-    将来 TranscriptSegment 增加 speaker 字段后，仅在此处读取真实说话人即可，
-    导出格式无需变动。
+    P9：接入说话人分离后读取 seg.speaker（如 SPEAKER_00 → 说话人 1）。
     """
-    return '发言人'
+    speaker = getattr(seg, 'speaker', None)
+    if not speaker:
+        return '发言人'
+    try:
+        return f'说话人 {int(speaker.split("_")[-1]) + 1}'
+    except (ValueError, AttributeError):
+        return speaker
 
 
 def segments_to_markdown(file_record, segments):

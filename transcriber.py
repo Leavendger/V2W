@@ -49,6 +49,7 @@ def transcribe(audio_path, model_size='medium', device='auto', compute_type='aut
             min_silence_duration_ms=500,
         ),
         condition_on_previous_text=False,  # 减少上下文依赖
+        word_timestamps=True,      # P9：词级时间戳，便于说话人对齐
     )
 
     logger.info(f'Detected language: {info.language} (probability={info.language_probability:.2f})')

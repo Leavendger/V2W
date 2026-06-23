@@ -9,6 +9,10 @@
         <span class="file-count">{{ files|length }} 个文件</span>
     </div>
     <div class="header-right">
+        <label class="diarize-toggle" title="上传后区分说话人（pyannote，耗时较长）">
+            <input type="checkbox" id="diarize-toggle">
+            <span>识别说话人</span>
+        </label>
         <label for="upload-input" class="upload-btn">+ 上传文件</label>
     </div>
 </div>
@@ -56,6 +60,7 @@
 
 <!-- 隐藏的上传 input，由 label 触发 -->
 <form id="upload-form" action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="diarize" id="diarize-flag" value="">
     <input id="upload-input" type="file" name="file" accept=".mp4,.mov,.avi,.wmv,.webm,.mkv,.flv,.mp3,.wav,.m4a,.flac,.aac,.ogg,.wma"
            onchange="this.form.submit()" hidden>
 </form>
@@ -67,6 +72,13 @@
     var uploadForm = document.getElementById('upload-form');
     var uploadInput = document.getElementById('upload-input');
     var dropOverlay = document.getElementById('drop-overlay');
+
+    // 说话人勾选：submit 前同步到 hidden flag
+    var diarizeToggle = document.getElementById('diarize-toggle');
+    var diarizeFlag = document.getElementById('diarize-flag');
+    uploadForm.addEventListener('submit', function() {
+        diarizeFlag.value = (diarizeToggle && diarizeToggle.checked) ? '1' : '';
+    });
     var mainContainer = document.getElementById('main-container');
     var dragCounter = 0;  // 处理子元素 dragenter/leave 冒泡
 

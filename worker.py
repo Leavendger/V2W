@@ -129,6 +129,21 @@ def _worker_loop(app):
                     compute_type=app.config.get('WHISPER_COMPUTE_TYPE', 'auto'),
                 )
 
+                # 3.5 说话人分离（按需：文件勾选 + 全局开关 + token）
+                speakers_assigned = False
+                if file_record.diarize and app.config.get('DIARIZATION_ENABLED'):
+                    try:
+                        from diarizer import diarize, assign_speakers
+                        hf_token = app.config.get('HF_TOKEN')
+                        timeline = diarize(audio_path, hf_token)
+                        assign_speakers(segments, timeline)
+                        speakers_assigned = True
+                        logger.info(f'Speaker diarization applied to file {file_id} '
+                                    f'({len(timeline)} turns)')
+                    except Exception as de:
+                        # 优雅降级：分离失败不影响转写，段落 speaker 留空
+                        logger.warning(f'Diarization failed for file {file_id}, skipping: {de}')
+
                 # 4. 写入段落
                 for i, seg in enumerate(segments):
                     segment = TranscriptSegment(
@@ -137,6 +152,7 @@ def _worker_loop(app):
                         end_time=seg['end'],
                         text=seg['text'],
                         segment_index=i,
+                        speaker=seg.get('speaker') if speakers_assigned else None,
                     )
                     db.session.add(segment)
 
