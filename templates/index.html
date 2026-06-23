@@ -9,8 +9,8 @@
         <span class="file-count">{{ files|length }} 个文件</span>
     </div>
     <div class="header-right">
-        <label class="diarize-toggle" title="上传后区分说话人（pyannote，耗时较长）">
-            <input type="checkbox" id="diarize-toggle">
+        <label class="diarize-toggle" id="diarize-toggle-label">
+            <input type="checkbox" id="diarize-toggle" checked>
             <span>识别说话人</span>
         </label>
         <label for="upload-input" class="upload-btn">+ 上传文件</label>
@@ -32,6 +32,7 @@
                 <span class="file-card-time">{{ file.formatted_created_at }}</span>
             </div>
             <div class="file-card-status">
+                {% if file.diarize %}<span class="diarize-badge" title="该项目启用了说话人区分">👤 说话人</span>{% endif %}
                 <span class="status-badge status-{{ file.status }}">{{ file.status_label }}</span>
             </div>
             <form action="{{ url_for('delete_file', file_id=file.id) }}" method="POST"
@@ -73,9 +74,18 @@
     var uploadInput = document.getElementById('upload-input');
     var dropOverlay = document.getElementById('drop-overlay');
 
-    // 说话人勾选：submit 前同步到 hidden flag
+    // 说话人勾选：submit 前同步到 hidden flag + hover 提示随勾选状态变化
     var diarizeToggle = document.getElementById('diarize-toggle');
     var diarizeFlag = document.getElementById('diarize-flag');
+    var diarizeLabel = document.getElementById('diarize-toggle-label');
+    function updateDiarizeHint() {
+        if (!diarizeLabel) return;
+        diarizeLabel.title = diarizeToggle.checked
+            ? '✅ 已勾选：将区分说话人（说话人 1/2/3），转译较慢'
+            : '⬜ 未勾选：不区分说话人，转译较快';
+    }
+    updateDiarizeHint();
+    if (diarizeToggle) diarizeToggle.addEventListener('change', updateDiarizeHint);
     uploadForm.addEventListener('submit', function() {
         diarizeFlag.value = (diarizeToggle && diarizeToggle.checked) ? '1' : '';
     });
