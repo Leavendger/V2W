@@ -171,7 +171,17 @@ def _worker_loop(app):
                         try:
                             from diarizer import diarize, assign_speakers
                             hf_token = app.config.get('HF_TOKEN')
-                            timeline = diarize(audio_path, hf_token)
+                            # pyannote 用 mpg123 解码 mp3，损坏的 MPEG 头会失败；
+                            # 统一转 16k mono wav（ffmpeg 解码容错）再喂给 diarize
+                            diarize_audio = audio_path
+                            temp_wav = None
+                            if not audio_path.endswith('.wav'):
+                                diarize_audio = audio_path + '.diarize.wav'
+                                temp_wav = diarize_audio
+                                extract_audio(audio_path, diarize_audio)
+                            timeline = diarize(diarize_audio, hf_token)
+                            if temp_wav and os.path.exists(temp_wav):
+                                os.remove(temp_wav)
                             assign_speakers(segments, timeline)
                             speakers_assigned = True
                             logger.info(f'Speaker diarization applied to file {file_id} '
