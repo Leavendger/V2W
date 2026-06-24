@@ -161,9 +161,58 @@ def create_app():
     # ============================================================
     @app.route('/file/<int:file_id>')
     def file_detail(file_id):
+        from models import TranscriptSegment
         file_record = File.query.get_or_404(file_id)
         segments = file_record.segments.all()
-        return render_template('detail.html', file=file_record, segments=segments)
+        # 是否可重新识别（completed + 所有段 speaker 为空 + 有段落）
+        can_rediarize = (file_record.status == 'completed' and bool(segments)
+                         and all(s.speaker is None for s in segments))
+        return render_template('detail.html', file=file_record, segments=segments,
+                               can_rediarize=can_rediarize)
+
+    # ============================================================
+    # P9b：说话人重命名（批量）+ 单段勘误
+    # ============================================================
+    @app.route('/file/<int:file_id>/speaker/<speaker_key>/rename', methods=['POST'])
+    def rename_speaker(file_id, speaker_key):
+        from models import FileSpeaker
+        File.query.get_or_404(file_id)  # 校验文件存在
+        name = (request.form.get('name') or '').strip()
+        if not name:
+            return jsonify({'ok': False, 'error': '名称不能为空'}), 400
+        fs = FileSpeaker.query.filter_by(file_id=file_id, speaker_key=speaker_key).first()
+        if fs:
+            fs.display_name = name
+        else:
+            db.session.add(FileSpeaker(file_id=file_id, speaker_key=speaker_key, display_name=name))
+        db.session.commit()
+        return jsonify({'ok': True, 'display_name': name})
+
+    @app.route('/segment/<int:seg_id>/speaker', methods=['POST'])
+    def update_segment_speaker(seg_id):
+        from models import TranscriptSegment
+        seg = TranscriptSegment.query.get_or_404(seg_id)
+        new_key = (request.form.get('speaker') or '').strip()
+        if not new_key:
+            return jsonify({'ok': False, 'error': 'speaker 不能为空'}), 400
+        seg.speaker = new_key
+        db.session.commit()
+        return jsonify({'ok': True, 'speaker': new_key})
+
+    @app.route('/file/<int:file_id>/rediarize', methods=['POST'])
+    def rediarize_file(file_id):
+        from models import TranscriptSegment
+        file_record = File.query.get_or_404(file_id)
+        # 仅 completed 且 speaker 全 NULL 文件可重新识别（避免覆盖已有 speaker）
+        if file_record.status != 'completed':
+            return jsonify({'ok': False, 'error': '文件未完成转写'}), 400
+        has_speaker = TranscriptSegment.query.filter_by(file_id=file_id).filter(
+            TranscriptSegment.speaker.isnot(None)).first()
+        if has_speaker:
+            return jsonify({'ok': False, 'error': '该文件已有说话人识别结果'}), 400
+        from worker import enqueue_rediarize
+        enqueue_rediarize(file_id)
+        return jsonify({'ok': True})
 
     # ============================================================
     # API：转写状态查询（前端轮询用）

@@ -44,6 +44,10 @@
             </div>
         </div>
         <div class="detail-header-actions">
+            {% if can_rediarize %}
+            <button type="button" class="rediarize-btn" id="rediarize-btn"
+                    title="复用已转写文字，只补说话人分离">👤 重新识别说话人</button>
+            {% endif %}
             {% if file.status == 'completed' %}
             <a href="{{ url_for('export_file', file_id=file.id) }}" class="export-btn" title="导出为 Markdown">
                 ⬇ 导出 Markdown
@@ -106,10 +110,10 @@
         <div class="segments-list" id="segments-list">
             {% for seg in segments %}
             <div class="segment-item" data-start="{{ seg.start_time }}" data-end="{{ seg.end_time }}"
-                 data-index="{{ seg.segment_index }}">
+                 data-index="{{ seg.segment_index }}" data-seg-id="{{ seg.id }}">
                 <span class="segment-time">{{ seg.formatted_time }}</span>
                 <span class="segment-text">
-                    {% if seg.speaker %}<span class="segment-speaker">{{ seg.speaker_display }}</span>{% endif %}
+                    {% if seg.speaker %}<span class="segment-speaker" data-speaker="{{ seg.speaker }}" title="点击改名 / 勘误">{{ seg.speaker_display }}</span>{% endif %}
                     {{ seg.text }}
                 </span>
             </div>
@@ -137,6 +141,30 @@
             <p>等待转写开始&hellip;</p>
         </div>
         {% endif %}
+    </div>
+</div>
+
+<!-- 说话人编辑弹框（P9b：批量改名 + 单段勘误） -->
+<div class="speaker-modal" id="speaker-modal" hidden>
+    <div class="speaker-modal-mask"></div>
+    <div class="speaker-modal-inner">
+        <div class="speaker-modal-title" id="sm-title">编辑说话人</div>
+        <div class="speaker-modal-tabs">
+            <button type="button" class="smtab active" data-mode="batch">批量修改（全部同名段）</button>
+            <button type="button" class="smtab" data-mode="single">单独修改（仅本段）</button>
+        </div>
+        <div id="sm-batch">
+            <p class="speaker-modal-hint">将该说话人的<strong>所有段落</strong>改名为：</p>
+            <input type="text" id="sm-name" class="speaker-modal-input" placeholder="如：张总">
+        </div>
+        <div id="sm-single" hidden>
+            <p class="speaker-modal-hint">把<strong>本段</strong>归属改为（修正机器识别错误）：</p>
+            <select id="sm-target" class="speaker-modal-input"></select>
+        </div>
+        <div class="speaker-modal-actions">
+            <button type="button" id="sm-cancel" class="speaker-modal-btn ghost">取消</button>
+            <button type="button" id="sm-ok" class="speaker-modal-btn primary">确定</button>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -395,6 +423,105 @@
                 }
             });
         }
+    }
+
+    // ============================================================
+    // 说话人编辑弹框（P9b：批量改名 + 单段勘误）
+    // ============================================================
+    var smModal = document.getElementById('speaker-modal');
+    if (smModal) {
+        var FILE_ID = '{{ file.id }}';
+        var smTitle = document.getElementById('sm-title');
+        var smBatch = document.getElementById('sm-batch');
+        var smSingle = document.getElementById('sm-single');
+        var smName = document.getElementById('sm-name');
+        var smTarget = document.getElementById('sm-target');
+        var smOk = document.getElementById('sm-ok');
+        var smCancel = document.getElementById('sm-cancel');
+        var smTabs = smModal.querySelectorAll('.smtab');
+        var curSegId = null, curSpeaker = null, curMode = 'batch';
+
+        function collectSpeakers() {
+            var map = {};
+            document.querySelectorAll('.segment-speaker').forEach(function (el) {
+                var k = el.getAttribute('data-speaker');
+                if (k && !(k in map)) map[k] = el.textContent;
+            });
+            return map;
+        }
+        function setMode(mode) {
+            curMode = mode;
+            smTabs.forEach(function (t) {
+                t.classList.toggle('active', t.getAttribute('data-mode') === mode);
+            });
+            smBatch.hidden = (mode !== 'batch');
+            smSingle.hidden = (mode !== 'single');
+        }
+        smTabs.forEach(function (t) {
+            t.addEventListener('click', function () { setMode(t.getAttribute('data-mode')); });
+        });
+
+        // 点段说话人标签 → 打开弹框
+        document.querySelectorAll('.segment-speaker').forEach(function (el) {
+            el.style.cursor = 'pointer';
+            el.addEventListener('click', function (e) {
+                e.stopPropagation();  // 不触发段跳转
+                var item = el.closest('.segment-item');
+                curSegId = item ? item.getAttribute('data-seg-id') : null;
+                curSpeaker = el.getAttribute('data-speaker');
+                smTitle.textContent = '编辑「' + el.textContent + '」';
+                smName.value = '';
+                var map = collectSpeakers();
+                smTarget.innerHTML = '';
+                Object.keys(map).sort().forEach(function (k) {
+                    var opt = document.createElement('option');
+                    opt.value = k; opt.textContent = map[k];
+                    smTarget.appendChild(opt);
+                });
+                var others = Object.keys(map).filter(function (k) { return k !== curSpeaker; });
+                if (others.length) smTarget.value = others[0];
+                setMode('batch');
+                smModal.hidden = false;
+            });
+        });
+
+        function smClose() { smModal.hidden = true; }
+        smCancel.addEventListener('click', smClose);
+        smModal.querySelector('.speaker-modal-mask').addEventListener('click', smClose);
+
+        smOk.addEventListener('click', function () {
+            if (curMode === 'batch') {
+                var name = smName.value.trim();
+                if (!name) { smName.focus(); return; }
+                fetch('/file/' + FILE_ID + '/speaker/' + encodeURIComponent(curSpeaker) + '/rename', {
+                    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'name=' + encodeURIComponent(name)
+                }).then(function (r) { return r.json(); }).then(function (d) {
+                    if (d.ok) location.reload(); else alert(d.error || '失败');
+                });
+            } else {
+                var target = smTarget.value;
+                fetch('/segment/' + curSegId + '/speaker', {
+                    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'speaker=' + encodeURIComponent(target)
+                }).then(function (r) { return r.json(); }).then(function (d) {
+                    if (d.ok) location.reload(); else alert(d.error || '失败');
+                });
+            }
+        });
+    }
+
+    // 重新识别说话人（P9b，详情头部按钮）
+    var rediarizeBtn = document.getElementById('rediarize-btn');
+    if (rediarizeBtn) {
+        rediarizeBtn.addEventListener('click', function () {
+            if (!confirm('将为该文件补做说话人分离（复用已转写文字，约数分钟）。开始？')) return;
+            fetch('/file/' + '{{ file.id }}' + '/rediarize', { method: 'POST' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.ok) location.reload(); else alert(d.error || '失败');
+                });
+        });
     }
 })();
 </script>

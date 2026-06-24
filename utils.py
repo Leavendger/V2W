@@ -73,10 +73,19 @@ def speaker_label(seg):
     """返回段落说话人友好标签。未识别返回占位「发言人」。
 
     P9：接入说话人分离后读取 seg.speaker（如 SPEAKER_00 → 说话人 1）。
+    P9b：优先查该文件的重命名（FileSpeaker.display_name）。
     """
     speaker = getattr(seg, 'speaker', None)
     if not speaker:
         return '发言人'
+    # 优先查重命名
+    try:
+        from models import FileSpeaker
+        fs = FileSpeaker.query.filter_by(file_id=seg.file_id, speaker_key=speaker).first()
+        if fs:
+            return fs.display_name
+    except Exception:
+        pass
     try:
         return f'说话人 {int(speaker.split("_")[-1]) + 1}'
     except (ValueError, AttributeError):

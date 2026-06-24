@@ -622,6 +622,27 @@ button { cursor: pointer; font-family: inherit; }
     color: #fff;
 }
 
+.rediarize-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 16px;
+    background: var(--bg-card);
+    color: #6a1b9a;
+    border: 1px solid #6a1b9a;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+
+.rediarize-btn:hover {
+    background: #6a1b9a;
+    color: #fff;
+}
+
 .detail-times {
     display: flex;
     gap: 16px;
@@ -1275,3 +1296,25 @@ mark {
     50%  { margin-left: 50%; }
     100% { margin-left: 100%; }
 }
+
+/* 说话人编辑弹框（P9b） */
+.speaker-modal { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; }
+.speaker-modal[hidden] { display: none; }
+.speaker-modal-mask { position: absolute; inset: 0; background: rgba(0,0,0,0.4); }
+.speaker-modal-inner {
+    position: relative; background: var(--bg-card); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg); padding: 24px; width: 380px; max-width: 90vw;
+}
+.speaker-modal-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+.speaker-modal-tabs { display: flex; gap: 4px; margin-bottom: 16px; background: var(--border-light); border-radius: 8px; padding: 3px; }
+.smtab { flex: 1; border: none; background: transparent; color: var(--text-secondary); font-size: 12px; padding: 7px 6px; border-radius: 6px; cursor: pointer; transition: all var(--transition); }
+.smtab.active { background: var(--bg-card); color: var(--primary); font-weight: 600; box-shadow: var(--shadow); }
+.speaker-modal-hint { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+.speaker-modal-input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; outline: none; box-sizing: border-box; }
+.speaker-modal-input:focus { border-color: var(--primary); }
+.speaker-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.speaker-modal-btn { padding: 7px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: all var(--transition); }
+.speaker-modal-btn.ghost { background: transparent; color: var(--text-secondary); }
+.speaker-modal-btn.ghost:hover { background: var(--border-light); }
+.speaker-modal-btn.primary { background: var(--primary); color: #fff; }
+.speaker-modal-btn.primary:hover { background: var(--primary-hover); }

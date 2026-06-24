@@ -98,9 +98,13 @@ class TranscriptSegment(db.Model):
 
     @property
     def speaker_display(self):
-        """说话人友好标签（说话人 N）。未识别返回空串。"""
+        """说话人友好标签。未识别返回空串；优先 FileSpeaker 重命名，回退「说话人 N」。"""
         if not self.speaker:
             return ''
+        # 优先查该文件对该 speaker_key 的重命名
+        fs = FileSpeaker.query.filter_by(file_id=self.file_id, speaker_key=self.speaker).first()
+        if fs:
+            return fs.display_name
         try:
             return f'说话人 {int(self.speaker.split("_")[-1]) + 1}'
         except (ValueError, AttributeError):
@@ -115,3 +119,18 @@ class TranscriptSegment(db.Model):
 
     def __repr__(self):
         return f'<Segment {self.id}: [{self.formatted_time}] {self.text[:30]}...>'
+
+
+class FileSpeaker(db.Model):
+    """说话人重命名（P9b，按文件维度）—— SPEAKER_00 → 张总"""
+    __tablename__ = 'file_speakers'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    file_id = db.Column(db.Integer, db.ForeignKey('files.id'), nullable=False)
+    speaker_key = db.Column(db.String(32), nullable=False)    # SPEAKER_00
+    display_name = db.Column(db.String(64), nullable=False)   # 张总
+
+    __table_args__ = (db.UniqueConstraint('file_id', 'speaker_key', name='uq_file_speaker'),)
+
+    def __repr__(self):
+        return f'<FileSpeaker {self.file_id}/{self.speaker_key} = {self.display_name}>'

@@ -72,9 +72,15 @@ def _is_file_deleted(session, file_id):
 
 
 def enqueue_file(file_id):
-    """将文件加入转写队列"""
-    _queue.put(file_id)
+    """将文件加入转写队列（转写任务）"""
+    _queue.put(('transcribe', file_id))
     logger.info(f'File {file_id} enqueued (queue size={_queue.qsize()})')
+
+
+def enqueue_rediarize(file_id):
+    """将文件加入队列做「重新识别说话人」（复用已转写文字，只补 diarization）"""
+    _queue.put(('rediarize', file_id))
+    logger.info(f'File {file_id} enqueued for rediarize (queue size={_queue.qsize()})')
 
 
 def start_worker(app):
@@ -102,10 +108,21 @@ def _worker_loop(app):
     from transcriber import transcribe_iter
 
     while True:
-        file_id = _queue.get()  # 阻塞等待新任务
+        task = _queue.get()  # 阻塞等待新任务 (kind, file_id)
+        if isinstance(task, tuple):
+            kind, file_id = task
+        else:
+            kind, file_id = 'transcribe', task
 
         with _lock:
             _current_task = file_id
+
+        # 重新识别说话人：复用已转写文字，只补 diarization
+        if kind == 'rediarize':
+            _do_rediarize(app, file_id)
+            with _lock:
+                _current_task = None
+            continue
 
         logger.info(f'Worker: processing file {file_id}')
 
@@ -248,3 +265,62 @@ def _worker_loop(app):
             finally:
                 with _lock:
                     _current_task = None
+
+
+def _do_rediarize(app, file_id):
+    """重新识别说话人：复用已转写文字段落，只补 diarization + 对齐。"""
+    from models import db, File
+    with app.app_context():
+        db.session.remove()
+        file_record = File.query.get(file_id)
+        if file_record is None:
+            logger.warning(f'Rediarize {file_id}: file not found, skip')
+            return
+        try:
+            file_record.status = 'processing'
+            _db_commit_with_retry(db.session)
+
+            stored_path = os.path.join(app.config['UPLOAD_FOLDER'], file_record.stored_path)
+            audio_path = stored_path
+            if file_record.file_type == 'video':
+                audio_path = stored_path + '.wav'
+                extract_audio(stored_path, audio_path)
+            # diarize 前 转 wav（规避损坏 mp3）
+            diarize_audio = audio_path
+            temp_wav = None
+            if not audio_path.endswith('.wav'):
+                diarize_audio = audio_path + '.diarize.wav'
+                temp_wav = diarize_audio
+                extract_audio(audio_path, diarize_audio)
+
+            from diarizer import diarize, assign_speakers
+            timeline = diarize(diarize_audio, app.config.get('HF_TOKEN'))
+            if temp_wav and os.path.exists(temp_wav):
+                os.remove(temp_wav)
+
+            segs = file_record.segments.all()
+            seg_dicts = [{'start': s.start_time, 'end': s.end_time} for s in segs]
+            assign_speakers(seg_dicts, timeline)
+            for s, d in zip(segs, seg_dicts):
+                s.speaker = d.get('speaker')
+            file_record.diarize = True
+            file_record.status = 'completed'
+            _db_commit_with_retry(db.session)
+
+            if file_record.file_type == 'video' and os.path.exists(audio_path):
+                os.remove(audio_path)
+            logger.info(f'Rediarize {file_id} done: {len(timeline)} turns')
+        except Exception as e:
+            logger.error(f'Rediarize {file_id} failed: {e}', exc_info=True)
+            if not _is_file_deleted(db.session, file_id):
+                try:
+                    file_record.status = 'completed'  # 回退（原本 completed）
+                    _db_commit_with_retry(db.session)
+                except Exception:
+                    db.session.rollback()
+            else:
+                db.session.rollback()
+            if file_record.file_type == 'video':
+                temp_wav_v = os.path.join(app.config['UPLOAD_FOLDER'], file_record.stored_path + '.wav')
+                if os.path.exists(temp_wav_v):
+                    os.remove(temp_wav_v)
