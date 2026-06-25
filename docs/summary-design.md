@@ -259,11 +259,12 @@ ollama pull qwen2.5:7b
 - [ ] Ollama 未运行 → 按钮提示，不报错、不影响其他功能；
 - [ ] 重新生成覆盖旧结果。
 
-### 12.2 P10b — 待办勾选 + 导出并入
+### 12.2 P10b — 待办勾选 + 导出并入 ✅
 
-- 行动项 checklist 可勾选（本地标记完成状态，存 `Summary.action_items` 的 `done` 字段）；
-- 关键词 chips 点击 → 联动详情页全文搜索（复用 P6）；
-- 导出 Markdown 在标题下追加「总结区块」。
+- [x] 行动项 checklist 可勾选（就地切换，乐观更新 + 失败回滚，存 `Summary.action_items` 的 `done` 字段）
+- [x] 关键词 chips 点击 → 联动详情页全文搜索（复用 P6，dispatchEvent input）
+- [x] 导出 Markdown 在标题下追加「总结区块」（摘要 + 行动项 `[ ]/[x]` + 关键词）
+- [x] action_items 存储升级为 `[{text, done}]`，`_normalize_actions` 兼容旧字符串数据
 
 ### 12.3 P10c（可选）— 自动 + 流式 + provider 管理页
 

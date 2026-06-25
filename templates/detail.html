@@ -118,7 +118,12 @@
             <div class="summary-block">
                 <h3>✅ 行动项</h3>
                 <ul class="action-list">
-                    {% for a in summary_actions %}<li>{{ a }}</li>{% endfor %}
+                    {% for a in summary_actions %}
+                    <li data-idx="{{ loop.index0 }}" class="action-item{% if a.done %} done{% endif %}">
+                        <span class="action-box">{% if a.done %}☑{% else %}☐{% endif %}</span>
+                        <span class="action-text">{{ a.text }}</span>
+                    </li>
+                    {% endfor %}
                 </ul>
             </div>
             {% endif %}
@@ -126,7 +131,7 @@
             <div class="summary-block">
                 <h3>🔑 关键词</h3>
                 <div class="keyword-chips">
-                    {% for k in summary_keywords %}<span class="keyword-chip">{{ k }}</span>{% endfor %}
+                    {% for k in summary_keywords %}<span class="keyword-chip" data-kw="{{ k }}">{{ k }}</span>{% endfor %}
                 </div>
             </div>
             {% endif %}
@@ -265,6 +270,43 @@
                 .catch(function () { btn.disabled = false; btn.textContent = orig; alert('网络错误'); });
         });
     }
+    // 行动项勾选（P10b，就地切换不刷新）
+    document.querySelectorAll('.action-item').forEach(function (li) {
+        li.addEventListener('click', function () {
+            var idx = li.getAttribute('data-idx');
+            var box = li.querySelector('.action-box');
+            var wasDone = li.classList.contains('done');
+            // 乐观更新：先切 UI
+            li.classList.toggle('done', !wasDone);
+            if (box) box.textContent = wasDone ? '☐' : '☑';
+            fetch('/api/file/' + '{{ file.id }}' + '/summary/action/' + idx, { method: 'POST' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (!d.ok) {  // 失败回滚
+                        li.classList.toggle('done', wasDone);
+                        if (box) box.textContent = wasDone ? '☑' : '☐';
+                        alert(d.error || '更新失败');
+                    }
+                })
+                .catch(function () {
+                    li.classList.toggle('done', wasDone);
+                    if (box) box.textContent = wasDone ? '☑' : '☐';
+                });
+        });
+    });
+    // 关键词 chip → 联动详情页搜索（复用 P6，触发 input 事件即可）
+    document.querySelectorAll('.keyword-chip').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+            var kw = chip.getAttribute('data-kw');
+            var input = document.getElementById('search-input');
+            if (input && kw) {
+                input.value = kw;
+                input.focus();
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
+    });
     // 若正在总结，轮询到完成/失败自动刷新
     {% if summary and summary.status == 'summarizing' %}
     (function pollSummary() {

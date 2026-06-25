@@ -1,5 +1,6 @@
 """V2W — AI 会议助手 Flask 应用入口"""
 import os
+import json
 import logging
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
 from config import Config
@@ -169,7 +170,8 @@ def create_app():
                          and all(s.speaker is None for s in segments))
         # AI 总结（P10）：当前总结记录 + 解析后的行动项/关键词 + 是否可用
         summary = Summary.query.filter_by(file_id=file_id).first()
-        summary_actions = Summary._loads_json(summary.action_items, []) if summary else []
+        summary_actions = Summary._normalize_actions(
+            Summary._loads_json(summary.action_items, [])) if summary else []
         summary_keywords = Summary._loads_json(summary.keywords, []) if summary else []
         summary_enabled = bool(app.config.get('SUMMARY_ENABLED')
                                and Config.current_llm_provider() is not None)
@@ -254,6 +256,21 @@ def create_app():
         if summary is None:
             return jsonify({'status': 'none'})
         return jsonify(summary.to_dict())
+
+    @app.route('/api/file/<int:file_id>/summary/action/<int:idx>', methods=['POST'])
+    def toggle_summary_action(file_id, idx):
+        """切换某条行动项的完成状态（P10b，就地勾选）。"""
+        from models import Summary
+        summary = Summary.query.filter_by(file_id=file_id).first()
+        if summary is None or summary.status != 'done':
+            return jsonify({'ok': False, 'error': '总结不存在或未完成'}), 400
+        actions = Summary._normalize_actions(Summary._loads_json(summary.action_items, []))
+        if idx < 0 or idx >= len(actions):
+            return jsonify({'ok': False, 'error': '行动项不存在'}), 400
+        actions[idx]['done'] = not actions[idx]['done']
+        summary.action_items = json.dumps(actions, ensure_ascii=False)
+        db.session.commit()
+        return jsonify({'ok': True, 'done': actions[idx]['done']})
 
     # ============================================================
     # API：转写状态查询（前端轮询用）
@@ -347,7 +364,9 @@ def create_app():
             flash('文件尚未转写完成，暂无法导出', 'error')
             return redirect(url_for('file_detail', file_id=file_id))
 
-        md_content = segments_to_markdown(file_record, file_record.segments.all())
+        from models import Summary
+        summary = Summary.query.filter_by(file_id=file_id).first()
+        md_content = segments_to_markdown(file_record, file_record.segments.all(), summary=summary)
 
         # 下载文件名：原文件名去扩展名 + .md；中文按 RFC 5987 编码
         base = os.path.splitext(file_record.filename)[0]

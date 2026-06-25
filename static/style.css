@@ -1413,16 +1413,26 @@ mark {
     color: var(--text-primary);
     white-space: pre-wrap;
 }
-.action-list { margin: 0; padding-left: 22px; list-style: none; }
-.action-list li {
-    position: relative;
+.action-list { margin: 0; padding-left: 0; list-style: none; }
+.action-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
     font-size: 14px;
     line-height: 1.7;
     color: var(--text-primary);
     margin-bottom: 4px;
+    cursor: pointer;
+    user-select: none;
+    padding: 3px 6px;
+    border-radius: 6px;
+    transition: background var(--transition);
 }
-.action-list li::before { content: '☐'; position: absolute; left: -20px; color: var(--primary); }
-.keyword-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.action-item:hover { background: var(--border-light); }
+.action-box { color: var(--primary); flex-shrink: 0; font-size: 15px; line-height: 1.6; }
+.action-text { flex: 1; }
+.action-item.done .action-text { text-decoration: line-through; color: var(--text-muted); }
+.action-item.done .action-box { color: var(--success); }
 .keyword-chip {
     display: inline-block;
     padding: 3px 12px;
@@ -1431,7 +1441,11 @@ mark {
     border-radius: 12px;
     font-size: 13px;
     font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
 }
+.keyword-chip:hover { background: var(--primary); color: #fff; }
+.keyword-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .summary-actions {
     display: flex;
     align-items: center;

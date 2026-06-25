@@ -158,6 +158,7 @@ AI 会议总结，一文件一份，手动触发后生成。
 | POST | `/file/<int:id>/rediarize` | — | 历史文件重新识别说话人并入队（迭代 P9b） |
 | POST | `/file/<int:id>/summarize` | application/json | 手动触发 AI 会议总结，入队（迭代 P10） |
 | GET | `/api/file/<int:id>/summary` | application/json | 取总结结果与状态（轮询，迭代 P10） |
+| POST | `/api/file/<int:id>/summary/action/<int:idx>` | application/json | 切换某条行动项完成状态（迭代 P10b） |
 
 > **全文搜索**基于现有 `transcript_segments`（转写文字）与 `files.filename`（项目名）用 `LIKE` 子串匹配实现（中文友好、零额外 schema），结果分「全部 / 项目名 / 转文字」三类 Tab。数据量增长后可平滑升级至 SQLite FTS5。详见 [docs/search-design.md](search-design.md)。
 

@@ -92,10 +92,11 @@ def speaker_label(seg):
         return speaker
 
 
-def segments_to_markdown(file_record, segments):
+def segments_to_markdown(file_record, segments, summary=None):
     """将转写段落导出为 Markdown 文本。
 
-    结构：# 文件名标题 + 元信息（时长/转写时间）+ 每段「说话人 tag · 时间戳 + 文字」。
+    结构：# 文件名标题 + 元信息 + [AI 总结区块] + 每段「说话人 tag · 时间戳 + 文字」。
+    summary（P10b）：传入 Summary 对象时，在元信息后追加 摘要/行动项/关键词 区块。
     """
     lines = []
     lines.append(f"# {file_record.filename}")
@@ -109,6 +110,27 @@ def segments_to_markdown(file_record, segments):
     if meta:
         lines.append("> " + " · ".join(meta))
         lines.append("")
+
+    # AI 总结区块（P10b）
+    if summary is not None and getattr(summary, 'status', None) == 'done':
+        from models import Summary as _Summary
+        actions = _Summary._normalize_actions(_Summary._loads_json(summary.action_items, []))
+        keywords = _Summary._loads_json(summary.keywords, [])
+        lines.append("## ✨ AI 会议总结")
+        lines.append("")
+        if summary.summary_text:
+            lines.append(f"> {summary.summary_text.replace(chr(10), ' ')}")
+            lines.append("")
+        if actions:
+            lines.append("**行动项：**")
+            lines.append("")
+            for a in actions:
+                mark = 'x' if a.get('done') else ' '
+                lines.append(f"- [{mark}] {a['text']}")
+            lines.append("")
+        if keywords:
+            lines.append("**关键词：** " + " · ".join(str(k) for k in keywords))
+            lines.append("")
 
     lines.append("---")
     lines.append("")

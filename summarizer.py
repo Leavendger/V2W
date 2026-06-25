@@ -113,7 +113,10 @@ def _chunk_text(text, chunk_chars):
 
 
 def _normalize(d):
-    """把模型返回的 dict 归一化为 {summary, action_items[str], keywords[str]}。"""
+    """把模型返回的 dict 归一化为 {summary, action_items[{text,done}], keywords[str]}。
+
+    action_items 统一成对象数组，便于 P10b 勾选标记完成状态（done 默认 False）。
+    """
     summary = (d.get('summary') or d.get('摘要') or '').strip()
     raw_actions = d.get('action_items') or d.get('行动项') or d.get('todos') or []
     raw_keywords = d.get('keywords') or d.get('关键词') or []
@@ -123,7 +126,7 @@ def _normalize(d):
         if isinstance(a, str):
             t = a.strip()
             if t:
-                norm_actions.append(t)
+                norm_actions.append({'text': t, 'done': False})
         elif isinstance(a, dict):
             parts = []
             main = a.get('text') or a.get('content') or a.get('item')
@@ -135,7 +138,7 @@ def _normalize(d):
                 parts.append(f'截止 {a["due"]}')
             t = ' '.join(parts).strip()
             if t:
-                norm_actions.append(t)
+                norm_actions.append({'text': t, 'done': bool(a.get('done'))})
     norm_kw = [str(k).strip() for k in raw_keywords if str(k).strip()]
     return {'summary': summary, 'action_items': norm_actions, 'keywords': norm_kw}
 

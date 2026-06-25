@@ -165,11 +165,28 @@ class Summary(db.Model):
         except (ValueError, TypeError):
             return default
 
+    @staticmethod
+    def _normalize_actions(raw):
+        """把 action_items 归一化为 [{text, done}]，兼容旧的纯字符串数组。"""
+        if not isinstance(raw, list):
+            return []
+        out = []
+        for a in raw:
+            if isinstance(a, str):
+                t = a.strip()
+                if t:
+                    out.append({'text': t, 'done': False})
+            elif isinstance(a, dict):
+                t = (a.get('text') or '').strip()
+                if t:
+                    out.append({'text': t, 'done': bool(a.get('done'))})
+        return out
+
     def to_dict(self):
         return {
             'status': self.status,
             'summary_text': self.summary_text or '',
-            'action_items': self._loads_json(self.action_items, []),
+            'action_items': self._normalize_actions(self._loads_json(self.action_items, [])),
             'keywords': self._loads_json(self.keywords, []),
             'provider': self.provider,
             'model_name': self.model_name,
