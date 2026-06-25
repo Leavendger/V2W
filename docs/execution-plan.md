@@ -17,6 +17,7 @@
 | P7  | 全文搜索（全局）    | 2     | 首页跨文件搜索、结果页、深链定位                    | ✅  |
 | P8  | 导出 Markdown | 2     | 详情页导出 .md（说话人 tag + 时间戳 + 文字）       | ✅  |
 | P9  | 说话人分离       | 3     | pyannote 区分说话人，详情页/导出归属（开关按需）       | ✅（a/b 完成，c 待定） |
+| P10 | AI 会议总结      | 3     | 摘要 + 行动项/待办 + 关键词（LLM，本地优先）          | 📋 规划中（[设计](summary-design.md)） |
 
 
 ---
@@ -255,6 +256,36 @@ python app.py
 
 ---
 
+## P10 — AI 会议总结 📋
+
+> 对应 [summary-design.md](summary-design.md)；把逐字稿升级为「会议纪要」（摘要 + 行动项 + 关键词）。
+
+**目标**：已完成转写的文件，一键生成会议摘要、待办事项、关键词，定位产品经理核心场景。
+
+**技术路线**：复用 worker 队列新增 `('summarize', id)` 任务；LLM provider 抽象，默认本地 Ollama（隐私优先），云端 API 可选。
+
+### 任务清单（P10a）
+
+- [ ] `models.py` 新增 `Summary` 表（摘要 / action_items / keywords / provider / model）
+- [ ] 新建 `summarizer.py`（拼接逐字稿 / 长文本 map-reduce / provider 抽象 / 容错 JSON 解析）
+- [ ] `config.py` 加总结配置（`LLM_PROVIDER` / `OLLAMA_*` / `OPENAI_*`，环境变量 + .env）
+- [ ] `worker.py` 新增 `('summarize', id)` 任务 + `enqueue_summarize()`
+- [ ] `app.py` 加 `POST /file/<id>/summarize`（入队）+ `GET /api/file/<id>/summary`（取结果）
+- [ ] `detail.html` 总结面板（摘要 / 待办 / 关键词）+ 生成按钮 + 状态轮询
+
+### 验证标准
+
+- 已完成文件 → 点「生成总结」→ 显示摘要 + 待办 + 关键词
+- 长会议（>1h）map-reduce 不截断
+- Ollama 未运行 → 按钮提示，不报错、不影响转写/搜索/导出
+
+### 后续
+
+- P10b：行动项勾选标记 + 关键词联动搜索 + 导出 md 并入总结区块
+- P10c（可选）：云端 API provider + 转写完成自动总结 + SSE 流式
+
+---
+
 ## 各阶段依赖关系
 
 ```
@@ -263,5 +294,6 @@ P0 ──→ P1 ──→ P2 ──→ P3 ──→ P4 ──→ P5
 P4 ──→ P6（单文件内搜索）──→ P7（全局搜索）
 P4 ──→ P8（导出 Markdown）
 P3 ──→ P9（说话人分离，依赖 ASR 管线）
+P3 ──→ P10（AI 总结，依赖逐字稿；P9 让待办归属到人更准）
 ```
 
