@@ -23,6 +23,9 @@
 | 文件管理  | ✅   | 删除文件（磁盘 + 数据库级联清理）、上传格式校验                    |
 | 数据持久化 | ✅   | SQLite 存储，关闭浏览器后历史记录不丢失                      |
 | 键盘快捷键 | ✅   | `Space` 播放/暂停 · `←` 后退 5s · `→` 前进 5s        |
+| 全文搜索  | ✅   | 详情页内关键词高亮导航（P6）+ 全局跨文件搜索、深链定位（P7） |
+| 导出 Markdown | ✅ | 详情页一键导出 .md（说话人 tag + 时间戳 + 文字，P8）   |
+| 说话人分离 | ✅   | pyannote 区分说话人，支持重命名 / 单段勘误 / 重新识别（P9） |
 
 
 ## 🎯 核心体验
@@ -43,8 +46,9 @@
 | ----- | -------------------------- | -------------------------------- |
 | 后端框架  | **Flask 3.1**              | 轻量 Python Web 框架                 |
 | 数据库   | **SQLite** + SQLAlchemy    | 零配置，单文件存储                        |
-| 语音识别  | **faster-whisper** (small) | CTranslate2 加速，本地运行，M4 芯片约 5× 实时 |
-| 音频处理  | **FFmpeg 8.1**             | 格式转换、视频提取音频                      |
+| 语音识别  | **faster-whisper** (medium) | CTranslate2 加速，本地运行，M4 芯片近实时（中文最佳） |
+| 说话人分离 | **pyannote.audio 3.1.1**   | 区分「谁在说话」，按需开关（需 HF token）       |
+| 音频处理  | **FFmpeg 8.x**             | 格式转换、视频提取音频、损坏头容错转 wav         |
 | 前端    | **Jinja2** + 原生 JS         | 服务端渲染，无前后端分离，零构建工具               |
 | UI 主题 | 淡蓝色 (`#f2f7fc`)            | 简洁直观，响应式布局                       |
 
@@ -103,26 +107,32 @@ brew install cloudflared
 ```
 V2W/
 ├── app.py                # Flask 应用入口 + 路由
-├── config.py             # 配置（模型、路径、格式白名单）
-├── models.py             # 数据模型（File / TranscriptSegment）
-├── transcriber.py        # Whisper 转写引擎封装
-├── worker.py             # 后台任务线程（队列 + 单任务处理）
-├── utils.py              # 工具函数（文件校验、格式化）
-├── requirements.txt      # Python 依赖
+├── config.py             # 配置（模型、路径、格式白名单、HF token）
+├── models.py             # 数据模型（File / TranscriptSegment / FileSpeaker）
+├── transcriber.py        # Whisper 转写引擎封装（word 级时间戳）
+├── diarizer.py           # pyannote 说话人分离 + 对齐（P9）
+├── worker.py             # 后台任务线程（队列 + 单任务串行）
+├── utils.py              # 工具函数（文件校验、speaker_label、导出 md）
+├── requirements.txt      # Python 依赖（py3.11 黄金组合）
+├── start_public.sh       # 一键启动 Flask + Cloudflare Tunnel
+├── LICENSE               # MIT
 ├── uploads/              # 上传文件存储（gitignore）
 ├── instance/             # SQLite 数据库（gitignore）
 ├── static/
 │   └── style.css         # 淡蓝主题样式
 ├── templates/
-│   ├── base.html         # 公共布局
-│   ├── index.html        # 首页 — 文件列表
-│   └── detail.html       # 详情页 — 播放器 + 转写
+│   ├── base.html         # 公共布局（含全局搜索框）
+│   ├── index.html        # 首页 — 文件卡片库
+│   ├── detail.html       # 详情页 — 播放器 + 转写 + 单文件搜索
+│   └── search.html       # 全局搜索结果页（P7）
 ├── docs/                 # 规范文档
 │   ├── requirements.md   # 产品需求文档
 │   ├── tech-spec.md      # 技术规范
 │   ├── design-spec.md    # UI 设计规范
 │   ├── execution-plan.md # 分阶段执行计划
-│   └── search-design.md  # 全文搜索详细设计
+│   ├── search-design.md  # 全文搜索详细设计
+│   ├── speaker-diarization-design.md  # 说话人分离设计（P9）
+│   └── hf-token-setup.md # HF token 配置指南
 ├── dev_logs/             # 开发日志
 └── README.md
 ```
@@ -136,8 +146,8 @@ V2W/
 | ---------------- | ----- | ------ | ---------- |
 | tiny             | 75MB  | 20× 实时 | ~3 分钟      |
 | base             | 145MB | 10× 实时 | ~6 分钟      |
-| **small** *(当前)* | 464MB | 5× 实时  | **~12 分钟** |
-| medium           | 1.5GB | 2× 实时  | ~30 分钟     |
+| small            | 464MB | 5× 实时  | ~12 分钟     |
+| **medium** *(当前)* | 1.5GB | 2× 实时 | **~30 分钟** |
 
 
 可在 `config.py` 中调整 `WHISPER_MODEL_SIZE` 切换模型。
@@ -146,7 +156,7 @@ V2W/
 
 ### 下一阶段
 
-- [x] 说话人分离（[设计](docs/speaker-diarization-design.md) · [HF token 配置](docs/hf-token-setup.md) · pyannote，识别说话人/快速转写切换，音频+视频已验证）
+- [x] 说话人分离（[设计](docs/speaker-diarization-design.md) · [HF token 配置](docs/hf-token-setup.md) · pyannote，识别说话人/快速转写切换，含重命名 / 单段勘误 / 重新识别，音频+视频已验证）
 - [ ] AI 自动总结（生成会议摘要）
 - [ ] 关键词与待办事项提取
 - [x] 全文搜索（[设计](docs/search-design.md) · 单文件内 P6 + 全局 P7，含项目名检索与「全部/项目名/转文字」三类 Tab）
