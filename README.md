@@ -157,7 +157,7 @@ V2W/
 ### 下一阶段
 
 - [x] 说话人分离（[设计](docs/speaker-diarization-design.md) · [HF token 配置](docs/hf-token-setup.md) · pyannote，识别说话人/快速转写切换，含重命名 / 单段勘误 / 重新识别，音频+视频已验证）
-- [ ] AI 自动总结（摘要 + 行动项 + 关键词，[设计](docs/summary-design.md) · 云端 API 优先·多厂商可切换 DeepSeek/GLM/通义…，本地 Ollama 备选）
+- [x] AI 自动总结（摘要 + 行动项 + 关键词，[设计](docs/summary-design.md) · 详情页手动触发，云端 API·多厂商可切换 DeepSeek/GLM/通义…）
 - [ ] 关键词与待办事项提取
 - [x] 全文搜索（[设计](docs/search-design.md) · 单文件内 P6 + 全局 P7，含项目名检索与「全部/项目名/转文字」三类 Tab）
 - [x] 导出 Markdown（详情页一键导出，含说话人 tag + 时间戳 + 文字）

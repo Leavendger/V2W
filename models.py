@@ -134,3 +134,48 @@ class FileSpeaker(db.Model):
 
     def __repr__(self):
         return f'<FileSpeaker {self.file_id}/{self.speaker_key} = {self.display_name}>'
+
+
+class Summary(db.Model):
+    """AI 会议总结（P10，一文件一份，手动触发后生成）
+
+    status：summarizing（生成中）/ done（完成）/ failed（失败）
+    action_items / keywords 以 JSON 字符串存储，读取时解析。
+    """
+    __tablename__ = 'summaries'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    file_id = db.Column(db.Integer, db.ForeignKey('files.id'), nullable=False, unique=True)
+    status = db.Column(db.String(16), default='summarizing')   # summarizing / done / failed
+    summary_text = db.Column(db.Text, nullable=True)           # 会议摘要
+    action_items = db.Column(db.Text, nullable=True)           # JSON: ["待办1", ...] 或 [{"text","owner","due"}]
+    keywords = db.Column(db.Text, nullable=True)               # JSON: ["关键词1", ...]
+    provider = db.Column(db.String(32), nullable=True)         # deepseek / glm / ...
+    model_name = db.Column(db.String(64), nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    @staticmethod
+    def _loads_json(s, default):
+        import json as _json
+        if not s:
+            return default
+        try:
+            return _json.loads(s)
+        except (ValueError, TypeError):
+            return default
+
+    def to_dict(self):
+        return {
+            'status': self.status,
+            'summary_text': self.summary_text or '',
+            'action_items': self._loads_json(self.action_items, []),
+            'keywords': self._loads_json(self.keywords, []),
+            'provider': self.provider,
+            'model_name': self.model_name,
+            'error_message': self.error_message,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else None,
+        }
+
+    def __repr__(self):
+        return f'<Summary file={self.file_id} [{self.status}]>'

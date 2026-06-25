@@ -1,5 +1,6 @@
 """V2W 后台转写任务 — 单线程队列处理"""
 import os
+import json
 import time
 import subprocess
 import threading
@@ -83,6 +84,12 @@ def enqueue_rediarize(file_id):
     logger.info(f'File {file_id} enqueued for rediarize (queue size={_queue.qsize()})')
 
 
+def enqueue_summarize(file_id):
+    """将文件加入队列做「AI 会议总结」（P10，手动触发）"""
+    _queue.put(('summarize', file_id))
+    logger.info(f'File {file_id} enqueued for summarize (queue size={_queue.qsize()})')
+
+
 def start_worker(app):
     """
     启动后台转写线程。
@@ -120,6 +127,13 @@ def _worker_loop(app):
         # 重新识别说话人：复用已转写文字，只补 diarization
         if kind == 'rediarize':
             _do_rediarize(app, file_id)
+            with _lock:
+                _current_task = None
+            continue
+
+        # AI 会议总结：手动触发，调 LLM 生成摘要/行动项/关键词（P10）
+        if kind == 'summarize':
+            _do_summarize(app, file_id)
             with _lock:
                 _current_task = None
             continue
@@ -324,3 +338,63 @@ def _do_rediarize(app, file_id):
                 temp_wav_v = os.path.join(app.config['UPLOAD_FOLDER'], file_record.stored_path + '.wav')
                 if os.path.exists(temp_wav_v):
                     os.remove(temp_wav_v)
+
+
+def _do_summarize(app, file_id):
+    """AI 会议总结：调 LLM 生成摘要/行动项/关键词，写入 Summary 表（P10）。
+
+    summary 行由 POST /file/<id>/summarize 路由预先创建（status=summarizing），
+    这里接力执行；若不存在则补建。失败置 status=failed + error_message。
+    """
+    from models import db, File, Summary
+    with app.app_context():
+        db.session.remove()
+        file_record = File.query.get(file_id)
+        if file_record is None:
+            logger.warning(f'Summarize {file_id}: file not found, skip')
+            return
+
+        summary = Summary.query.filter_by(file_id=file_id).first()
+        if summary is None:
+            summary = Summary(file_id=file_id, status='summarizing')
+            db.session.add(summary)
+
+        try:
+            from config import Config
+            from summarizer import summarize_segments
+
+            if file_record.status != 'completed':
+                raise RuntimeError('文件尚未完成转写，无法总结')
+
+            provider = Config.current_llm_provider()
+            if provider is None:
+                raise RuntimeError('未配置 LLM API key，请在 .env 设置（如 DEEPSEEK_API_KEY）并选 LLM_PROVIDER')
+
+            segments = file_record.segments.all()
+            if not segments:
+                raise RuntimeError('转写内容为空')
+
+            chunk_chars = app.config.get('SUMMARY_CHUNK_CHARS', 6000)
+            result = summarize_segments(segments, provider, chunk_chars)
+
+            summary.summary_text = result['summary']
+            summary.action_items = json.dumps(result['action_items'], ensure_ascii=False)
+            summary.keywords = json.dumps(result['keywords'], ensure_ascii=False)
+            summary.provider = provider['name']
+            summary.model_name = provider['model']
+            summary.status = 'done'
+            summary.error_message = None
+            _db_commit_with_retry(db.session)
+            logger.info(f'Summarize {file_id} done (provider={provider["name"]}/{provider["model"]})')
+
+        except Exception as e:
+            logger.error(f'Summarize {file_id} failed: {e}', exc_info=True)
+            if not _is_file_deleted(db.session, file_id):
+                try:
+                    summary.status = 'failed'
+                    summary.error_message = str(e)[:500]
+                    _db_commit_with_retry(db.session)
+                except Exception:
+                    db.session.rollback()
+            else:
+                db.session.rollback()

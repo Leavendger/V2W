@@ -161,14 +161,23 @@ def create_app():
     # ============================================================
     @app.route('/file/<int:file_id>')
     def file_detail(file_id):
-        from models import TranscriptSegment
+        from models import TranscriptSegment, Summary
         file_record = File.query.get_or_404(file_id)
         segments = file_record.segments.all()
         # 是否可重新识别（completed + 所有段 speaker 为空 + 有段落）
         can_rediarize = (file_record.status == 'completed' and bool(segments)
                          and all(s.speaker is None for s in segments))
+        # AI 总结（P10）：当前总结记录 + 解析后的行动项/关键词 + 是否可用
+        summary = Summary.query.filter_by(file_id=file_id).first()
+        summary_actions = Summary._loads_json(summary.action_items, []) if summary else []
+        summary_keywords = Summary._loads_json(summary.keywords, []) if summary else []
+        summary_enabled = bool(app.config.get('SUMMARY_ENABLED')
+                               and Config.current_llm_provider() is not None)
         return render_template('detail.html', file=file_record, segments=segments,
-                               can_rediarize=can_rediarize)
+                               can_rediarize=can_rediarize,
+                               summary=summary, summary_actions=summary_actions,
+                               summary_keywords=summary_keywords,
+                               summary_enabled=summary_enabled)
 
     # ============================================================
     # P9b：说话人重命名（批量）+ 单段勘误
@@ -213,6 +222,38 @@ def create_app():
         from worker import enqueue_rediarize
         enqueue_rediarize(file_id)
         return jsonify({'ok': True})
+
+    # ============================================================
+    # P10：AI 会议总结（手动触发 + 状态查询）
+    # ============================================================
+    @app.route('/file/<int:file_id>/summarize', methods=['POST'])
+    def summarize_file(file_id):
+        from models import Summary
+        from worker import enqueue_summarize
+        file_record = File.query.get_or_404(file_id)
+        if file_record.status != 'completed':
+            return jsonify({'ok': False, 'error': '文件尚未完成转写'}), 400
+        if not app.config.get('SUMMARY_ENABLED') or Config.current_llm_provider() is None:
+            return jsonify({'ok': False, 'error': 'AI 总结未配置（缺少 LLM API key，请在 .env 设置）'}), 400
+        # 创建/重置总结记录为 summarizing，再入队（前端 reload 即见 loading）
+        summary = Summary.query.filter_by(file_id=file_id).first()
+        if summary is None:
+            summary = Summary(file_id=file_id)
+            db.session.add(summary)
+        summary.status = 'summarizing'
+        summary.error_message = None
+        db.session.commit()
+        enqueue_summarize(file_id)
+        return jsonify({'ok': True})
+
+    @app.route('/api/file/<int:file_id>/summary')
+    def api_file_summary(file_id):
+        from models import Summary
+        File.query.get_or_404(file_id)
+        summary = Summary.query.filter_by(file_id=file_id).first()
+        if summary is None:
+            return jsonify({'status': 'none'})
+        return jsonify(summary.to_dict())
 
     # ============================================================
     # API：转写状态查询（前端轮询用）

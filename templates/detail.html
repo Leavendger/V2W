@@ -87,6 +87,58 @@
     </div>
     {% endif %}
 
+    <!-- AI 会议总结（P10，手动按钮触发，默认不自动生成） -->
+    {% if file.status == 'completed' and summary_enabled %}
+    <div class="summary-section" id="summary-section">
+        <h2 class="summary-title">✨ AI 会议总结</h2>
+        {% if not summary %}
+        <div class="summary-empty">
+            <p>点击按钮，AI 将生成摘要、行动项与关键词（默认不自动生成）。</p>
+            <button type="button" id="summarize-btn" class="summarize-btn">✨ 生成 AI 总结</button>
+        </div>
+        {% elif summary.status == 'summarizing' %}
+        <div class="summary-loading">
+            <div class="spinner"></div>
+            <p>正在生成总结，通常数十秒，请稍候…</p>
+        </div>
+        {% elif summary.status == 'failed' %}
+        <div class="summary-error">
+            <p>⚠ 总结失败：{{ summary.error_message or '未知错误' }}</p>
+            <button type="button" id="summarize-btn" class="summarize-btn">重试</button>
+        </div>
+        {% else %}
+        <div class="summary-body">
+            {% if summary.summary_text %}
+            <div class="summary-block">
+                <h3>📝 摘要</h3>
+                <p>{{ summary.summary_text }}</p>
+            </div>
+            {% endif %}
+            {% if summary_actions %}
+            <div class="summary-block">
+                <h3>✅ 行动项</h3>
+                <ul class="action-list">
+                    {% for a in summary_actions %}<li>{{ a }}</li>{% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            {% if summary_keywords %}
+            <div class="summary-block">
+                <h3>🔑 关键词</h3>
+                <div class="keyword-chips">
+                    {% for k in summary_keywords %}<span class="keyword-chip">{{ k }}</span>{% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            <div class="summary-actions">
+                <span class="summary-meta">{% if summary.provider %}{{ summary.provider }} · {{ summary.model_name }}{% endif %}</span>
+                <button type="button" id="summarize-btn" class="summarize-btn ghost">↻ 重新生成</button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- 转写文字区 -->
     <div class="transcript-section" id="transcript-section">
         <div class="transcript-header">
@@ -194,6 +246,37 @@
                 .catch(function() { setTimeout(poll, 3000); });
         })();
     }
+
+    // ============================================================
+    // AI 会议总结（P10，手动按钮触发，默认不自动生成）
+    // ============================================================
+    var summarizeBtn = document.getElementById('summarize-btn');
+    if (summarizeBtn) {
+        summarizeBtn.addEventListener('click', function () {
+            if (!confirm('将调用 AI 生成会议总结（摘要 + 行动项 + 关键词），可能耗时数十秒。开始？')) return;
+            var btn = this, orig = btn.textContent;
+            btn.disabled = true; btn.textContent = '提交中…';
+            fetch('/file/' + '{{ file.id }}' + '/summarize', { method: 'POST' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.ok) location.reload();
+                    else { alert(d.error || '提交失败'); btn.disabled = false; btn.textContent = orig; }
+                })
+                .catch(function () { btn.disabled = false; btn.textContent = orig; alert('网络错误'); });
+        });
+    }
+    // 若正在总结，轮询到完成/失败自动刷新
+    {% if summary and summary.status == 'summarizing' %}
+    (function pollSummary() {
+        fetch('/api/file/' + '{{ file.id }}' + '/summary')
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.status === 'done' || d.status === 'failed') location.reload();
+                else setTimeout(pollSummary, 3000);
+            })
+            .catch(function () { setTimeout(pollSummary, 3000); });
+    })();
+    {% endif %}
 
     // ============================================================
     // 如果播放器和段落都存在，启用交互

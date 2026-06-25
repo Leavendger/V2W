@@ -1,5 +1,6 @@
 """V2W 应用配置"""
 import os
+import json
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -21,6 +22,16 @@ def _load_env_file():
 
 
 _LOCAL_ENV = _load_env_file()
+
+
+def _load_providers(path):
+    """读取 llm_providers.json 预设表；文件缺失或损坏返回空 dict（P10）。"""
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, ValueError):
+        return {}
 
 
 class Config:
@@ -69,3 +80,40 @@ class Config:
     DIARIZATION_ENABLED = os.environ.get('DIARIZATION_ENABLED', 'true').lower() == 'true'
     # HuggingFace token：环境变量优先，回退本地 .env（配置见 docs/hf-token-setup.md）
     HF_TOKEN = os.environ.get('HF_TOKEN') or _LOCAL_ENV.get('HF_TOKEN')
+
+    # AI 会议总结（迭代 P10，云端 API 优先 + 多 provider 预设）
+    SUMMARY_ENABLED = os.environ.get('SUMMARY_ENABLED', 'true').lower() == 'true'
+    # 当前 provider：llm_providers.json 里的 key（deepseek / glm / qwen / mimo / openai / ollama）
+    LLM_PROVIDER = os.environ.get('LLM_PROVIDER', 'deepseek')
+    # 多厂商预设表（可入 git 的示例，用户可自由编辑增删厂商）
+    LLM_PROVIDERS = _load_providers(os.path.join(BASE_DIR, 'llm_providers.json'))
+    # 转写完成后是否自动总结（默认关，详情页手动按钮触发）
+    SUMMARY_AUTO = False
+    # 长文本分段阈值（逐字稿字符数），超过走 map-reduce 分段总结再合并
+    SUMMARY_CHUNK_CHARS = 6000
+
+    @staticmethod
+    def current_llm_provider():
+        """解析当前 provider：预设 + 对应环境变量的 api_key。
+
+        返回 {name, display, base_url, model, api_key}；
+        预设不存在或云端缺 key 时返回 None（视为未配置，按钮置灰）。
+        """
+        name = Config.LLM_PROVIDER
+        p = Config.LLM_PROVIDERS.get(name)
+        if not p:
+            return None
+        key_env = p.get('api_key_env', '')
+        api_key = ''
+        if key_env:
+            api_key = os.environ.get(key_env) or _LOCAL_ENV.get(key_env, '')
+        # Ollama 无需 key；云端 provider 缺 key → 视为未配置
+        if not api_key and name != 'ollama':
+            return None
+        return {
+            'name': name,
+            'display': p.get('display', name),
+            'base_url': p.get('base_url', '').rstrip('/'),
+            'model': p.get('model', ''),
+            'api_key': api_key or 'ollama',
+        }

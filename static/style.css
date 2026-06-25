@@ -1318,3 +1318,132 @@ mark {
 .speaker-modal-btn.ghost:hover { background: var(--border-light); }
 .speaker-modal-btn.primary { background: var(--primary); color: #fff; }
 .speaker-modal-btn.primary:hover { background: var(--primary-hover); }
+
+/* ============================================================
+   AI 会议总结（P10）
+   ============================================================ */
+.summary-section {
+    border-top: 1px solid var(--border-light);
+    padding-top: 24px;
+    margin-bottom: 24px;
+}
+.summary-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 空 / 失败态 */
+.summary-empty {
+    text-align: center;
+    padding: 28px 20px;
+    color: var(--text-secondary);
+    background: var(--primary-light);
+    border: 1px dashed var(--primary);
+    border-radius: var(--radius);
+}
+.summary-empty p { margin: 0 0 14px; font-size: 14px; }
+.summary-error {
+    text-align: center;
+    padding: 24px 20px;
+    background: var(--danger-light);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    color: #b71c1c;
+}
+.summary-error p { margin: 0 0 14px; font-size: 14px; }
+
+/* 生成按钮（主 CTA，蓝填充；.ghost 为描边重新生成） */
+.summarize-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 22px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.summarize-btn:hover { background: var(--primary-hover); }
+.summarize-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.summarize-btn.ghost {
+    background: var(--bg-card);
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    padding: 6px 16px;
+    font-size: 13px;
+}
+.summarize-btn.ghost:hover { background: var(--primary); color: #fff; }
+
+/* 生成中 */
+.summary-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* 结果 */
+.summary-body { display: flex; flex-direction: column; gap: 14px; }
+.summary-block {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+}
+.summary-block h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    color: var(--text-primary);
+}
+.summary-block p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+}
+.action-list { margin: 0; padding-left: 22px; list-style: none; }
+.action-list li {
+    position: relative;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+.action-list li::before { content: '☐'; position: absolute; left: -20px; color: var(--primary); }
+.keyword-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.keyword-chip {
+    display: inline-block;
+    padding: 3px 12px;
+    background: var(--primary-light);
+    color: var(--primary);
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 500;
+}
+.summary-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.summary-meta { font-size: 12px; color: var(--text-muted); }
+
+/* 视频左右分栏：总结区与转写区同列 */
+.detail-video-layout .summary-section {
+    flex: 1 1 40%;
+    min-width: 320px;
+    border-top: none;
+    padding-top: 0;
+}

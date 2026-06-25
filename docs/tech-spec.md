@@ -31,6 +31,8 @@
     ├── POST /file/<id>/speaker/<key>/rename → 说话人重命名 SPEAKER_00 → 张总（P9b）
     ├── POST /segment/<seg_id>/speaker      → 单段说话人勘误（P9b）
     ├── POST /file/<id>/rediarize           → 历史文件重新识别说话人（P9b）
+    ├── POST /file/<id>/summarize           → AI 会议总结（手动触发，P10）
+    ├── GET  /api/file/<id>/summary         → 取总结结果（轮询，P10）
     ├── GET  /api/file/<id>/status          → JSON 文件状态查询
     ├── GET  /api/worker/status             → JSON worker 队列状态（终止反馈轮询）
     └── GET  /uploads/<path>                → 静态文件服务
@@ -43,6 +45,7 @@
   (SQLite)      │
                 ├── transcriber.py   (faster-whisper 转写，开 word_timestamps)
                 ├── diarizer.py      (pyannote 分离 + assign_speakers 对齐，token 缺失优雅降级)
+                ├── summarizer.py    (AI 总结，统一 OpenAI 兼容客户端 + map-reduce，P10)
                 └── utils.py         (文件校验 / ffmpeg 提取音频 / speaker_label / 导出 md)
 ```
 
@@ -116,6 +119,25 @@ V2W/
 
 > `(file_id, speaker_key)` 唯一约束。详情页 `speaker_display` 优先读 FileSpeaker，回退「说话人 N」。
 
+### Summary 表（P10）
+
+AI 会议总结，一文件一份，手动触发后生成。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER (PK) | 自增主键 |
+| file_id | INTEGER (FK, UNIQUE) | 关联 File，一文件一份 |
+| status | VARCHAR(16) | summarizing / done / failed |
+| summary_text | TEXT | 会议摘要 |
+| action_items | TEXT | JSON 字符串：待办事项数组 |
+| keywords | TEXT | JSON 字符串：关键词数组 |
+| provider | VARCHAR(32) | 用的 LLM provider（deepseek/glm/...） |
+| model_name | VARCHAR(64) | 模型名 |
+| error_message | TEXT | 失败原因 |
+| created_at | DATETIME | 生成时间 |
+
+> provider 由 `llm_providers.json` 预设表 + `config.current_llm_provider()` 驱动，换厂商改配置零代码改动。
+
 ## 5. API 路由
 
 | 方法 | 路径 | Content-Type | 说明 |
@@ -134,6 +156,8 @@ V2W/
 | POST | `/file/<int:id>/speaker/<key>/rename` | application/json | 说话人重命名 SPEAKER_00 → 张总（迭代 P9b） |
 | POST | `/segment/<int:seg_id>/speaker` | application/json | 单段说话人勘误（迭代 P9b） |
 | POST | `/file/<int:id>/rediarize` | — | 历史文件重新识别说话人并入队（迭代 P9b） |
+| POST | `/file/<int:id>/summarize` | application/json | 手动触发 AI 会议总结，入队（迭代 P10） |
+| GET | `/api/file/<int:id>/summary` | application/json | 取总结结果与状态（轮询，迭代 P10） |
 
 > **全文搜索**基于现有 `transcript_segments`（转写文字）与 `files.filename`（项目名）用 `LIKE` 子串匹配实现（中文友好、零额外 schema），结果分「全部 / 项目名 / 转文字」三类 Tab。数据量增长后可平滑升级至 SQLite FTS5。详见 [docs/search-design.md](search-design.md)。
 
