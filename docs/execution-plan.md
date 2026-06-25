@@ -17,7 +17,7 @@
 | P7  | 全文搜索（全局）    | 2     | 首页跨文件搜索、结果页、深链定位                    | ✅  |
 | P8  | 导出 Markdown | 2     | 详情页导出 .md（说话人 tag + 时间戳 + 文字）       | ✅  |
 | P9  | 说话人分离       | 3     | pyannote 区分说话人，详情页/导出归属（开关按需）       | ✅（a/b 完成，c 待定） |
-| P10 | AI 会议总结      | 3     | 摘要 + 行动项/待办 + 关键词（LLM，本地优先）          | 📋 规划中（[设计](summary-design.md)） |
+| P10 | AI 会议总结      | 3     | 摘要 + 行动项/待办 + 关键词（LLM，云端 API·多厂商可切换） | 📋 规划中（[设计](summary-design.md)） |
 
 
 ---
@@ -262,13 +262,13 @@ python app.py
 
 **目标**：已完成转写的文件，一键生成会议摘要、待办事项、关键词，定位产品经理核心场景。
 
-**技术路线**：复用 worker 队列新增 `('summarize', id)` 任务；LLM provider 抽象，默认本地 Ollama（隐私优先），云端 API 可选。
+**技术路线**：复用 worker 队列新增 `('summarize', id)` 任务；统一 OpenAI 兼容客户端 + `llm_providers.json` 多厂商预设，默认云端 API（DeepSeek，配置切换 GLM/通义/OpenAI…），本地 Ollama 为零出域备选。
 
 ### 任务清单（P10a）
 
 - [ ] `models.py` 新增 `Summary` 表（摘要 / action_items / keywords / provider / model）
 - [ ] 新建 `summarizer.py`（拼接逐字稿 / 长文本 map-reduce / provider 抽象 / 容错 JSON 解析）
-- [ ] `config.py` 加总结配置（`LLM_PROVIDER` / `OLLAMA_*` / `OPENAI_*`，环境变量 + .env）
+- [ ] `config.py` 加总结配置 + `llm_providers.json` 多厂商预设表（环境变量 + .env）
 - [ ] `worker.py` 新增 `('summarize', id)` 任务 + `enqueue_summarize()`
 - [ ] `app.py` 加 `POST /file/<id>/summarize`（入队）+ `GET /api/file/<id>/summary`（取结果）
 - [ ] `detail.html` 总结面板（摘要 / 待办 / 关键词）+ 生成按钮 + 状态轮询

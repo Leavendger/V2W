@@ -49,13 +49,13 @@ LLM 推理几秒到几十秒，**不能阻塞请求**。复用现有 `worker.py`
 
 ## 3. 技术选型
 
-| 方案 | 做法 | 隐私 | 质量 | 依赖 | 决策 |
+| 方案 | 做法 | 隐私 | 质量 | 部署 | 决策 |
 |------|------|------|------|------|------|
-| **A · 本地 Ollama** | `summarizer.py` 调本地 Ollama HTTP API | ✅ 全本地 | 中 | 装 Ollama + 拉模型 | ✅ **默认** |
-| **B · 云端 API** | OpenAI / Claude / 通义 / 智谱 兼容接口 | ⚠️ 出域 | 高 | API key + 联网 | ✅ **可选 provider** |
-| C · 规则提取 | 正则 + TF-IDF 关键词，无 LLM | ✅ | 低 | 无 | ✗（质量不达标） |
+| **A · 云端 API（多厂商）** | OpenAI 兼容协议，配置驱动切换 DeepSeek / GLM / MiMo / 通义 / OpenAI | ⚠️ 出域 | 高 | 服务器零负担 | ✅ **默认** |
+| B · 本地 Ollama | 同走 OpenAI 兼容端点（Ollama `/v1`） | ✅ 本地 | 中 | 需 GPU/大内存 | ✅ **可选 provider** |
+| C · 规则提取 | 正则 + TF-IDF 关键词，无 LLM | ✅ | 低 | — | ✗（质量不达标） |
 
-**决策：抽象 LLM provider 接口，默认 Ollama（贴合 README「本地处理、隐私安全」定位），云端 API 作为可切换 provider。** 两者共用同一套 prompt 与解析逻辑，`config.LLM_PROVIDER` 切换。
+**决策：云端 API 为主（后期部署到服务器，无需本地算力），provider 抽象 + 多厂商预设，配置文件一键切换。** 关键简化——主流厂商（DeepSeek / 智谱 GLM / MiMo / 通义 / Kimi / OpenAI）乃至本地 Ollama **全都提供 OpenAI 兼容的 `/chat/completions`**，因此 `summarizer.py` 只需**一套** HTTP 客户端，provider 只是 `{base_url, model, api_key}` 三元组，靠预设表驱动，换厂商零代码改动。
 
 ## 4. 数据模型
 
@@ -109,28 +109,31 @@ class Summary(db.Model):
 ## 6. summarizer.py 设计
 
 ```python
-# summarizer.py（新增）
-def summarize_segments(segments, file_record, provider, model):
-    """主入口：逐字稿 → {summary, action_items, keywords}。
-    1. 拼接文本（带说话人 + 时间）
-    2. 超阈值 → map-reduce 分段总结再合并
-    3. 调 provider 生成结构化 JSON
-    4. 容错解析返回 dict
-    """
-    text = build_transcript_text(segments)          # 复用 speaker_label
+# summarizer.py（新增）—— 一套 OpenAI 兼容客户端，provider 靠预设表驱动
+def summarize_segments(segments, file_record):
+    """主入口：逐字稿 → {summary, action_items, keywords}。"""
+    text = build_transcript_text(segments)          # 复用 utils.speaker_label
     if estimate_tokens(text) > CHUNK_THRESHOLD:
-        text = map_reduce_summarize(text, provider, model)
-    raw = call_llm(SUMMARY_PROMPT, text, provider, model)
+        text = map_reduce_summarize(text)           # 分段总结再合并
+    raw = chat_complete(SUMMARY_PROMPT, text)       # 统一走 OpenAI 兼容协议
     return parse_summary_json(raw)                  # 容错：JSON 修复 / 正则兜底
 
-# provider 抽象（两个实现共用 prompt）
-def call_llm(prompt, text, provider, model):
-    if provider == 'ollama':
-        return _call_ollama(prompt, text, model)    # POST http://localhost:11434/api/generate
-    if provider == 'openai':
-        return _call_openai(prompt, text, model)    # 兼容 OpenAI / 通义 / 智谱的 /chat/completions
-    raise ValueError(f'unknown provider: {provider}')
+def chat_complete(prompt, text):
+    """唯一的 LLM 调用入口。从 config 取当前 provider 预设，POST /chat/completions。
+    DeepSeek / GLM / MiMo / 通义 / OpenAI / Ollama(/v1) 全走这一条。"""
+    p = current_llm_provider()                      # {base_url, model, api_key}
+    resp = requests.post(
+        f"{p['base_url']}/chat/completions",
+        headers={"Authorization": f"Bearer {p['api_key']}"},
+        json={"model": p["model"],
+              "messages": [{"role": "user", "content": f"{prompt}\n\n{text}"}],
+              "response_format": {"type": "json_object"},  # 支持 JSON 模式更稳
+              "temperature": 0.3},
+        timeout=120)
+    return resp.json()["choices"][0]["message"]["content"]
 ```
+
+> **不为每家厂商写单独实现。** `response_format: json_object` 在 DeepSeek / GLM / 通义 / OpenAI 上均支持；不支持的厂商靠 prompt 约束 + 容错解析兜底。Ollama 也开 `/v1/chat/completions` 兼容端点，作为零出域备选 provider 接进来无需额外代码。
 
 ### 6.1 结构化 prompt（示例）
 
@@ -151,34 +154,66 @@ def call_llm(prompt, text, provider, model):
 
 按 ~15 分钟 / ~4000 字切块 → 每块单独总结 → 把各块总结再合并成最终摘要。待办/关键词则去重合并。
 
-## 7. 配置项
+## 7. 配置项（多 provider 预设，配置文件驱动切换）
 
-`config.py` 新增（风格对齐 `HF_TOKEN`，环境变量优先 + 本地 `.env` 回退）：
+两层配置：**预设表**（可入 git 的示例，用户可自由编辑增删厂商）+ **当前选择与密钥**（环境变量 / `.env`，不入 git）。
+
+### 7.1 预设表 `llm_providers.json`（项目根，入 git 作示例）
+
+```json
+{
+  "deepseek": { "display": "DeepSeek",   "base_url": "https://api.deepseek.com/v1",            "model": "deepseek-chat",  "api_key_env": "DEEPSEEK_API_KEY" },
+  "glm":      { "display": "智谱 GLM",   "base_url": "https://open.bigmodel.cn/api/paas/v4",  "model": "glm-4-flash",    "api_key_env": "GLM_API_KEY" },
+  "mimo":     { "display": "MiMo",       "base_url": "https://api.mimo.example/v1",            "model": "mimo-xxx",       "api_key_env": "MIMO_API_KEY" },
+  "qwen":     { "display": "通义千问",   "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "model": "qwen-plus", "api_key_env": "DASHSCOPE_API_KEY" },
+  "openai":   { "display": "OpenAI",     "base_url": "https://api.openai.com/v1",              "model": "gpt-4o-mini",    "api_key_env": "OPENAI_API_KEY" },
+  "ollama":   { "display": "本地 Ollama", "base_url": "http://localhost:11434/v1",             "model": "qwen2.5:7b",     "api_key_env": "" }
+}
+```
+
+### 7.2 config.py（读预设 + 当前选择）
 
 ```python
 # AI 总结（迭代 P10）
 SUMMARY_ENABLED = os.environ.get('SUMMARY_ENABLED', 'true').lower() == 'true'
-LLM_PROVIDER = os.environ.get('LLM_PROVIDER', 'ollama')   # ollama / openai
-OLLAMA_BASE_URL = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
-OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'qwen2.5:7b')   # 中文友好
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY') or _LOCAL_ENV.get('OPENAI_API_KEY')
-OPENAI_BASE_URL = os.environ.get('OPENAI_BASE_URL', 'https://api.openai.com/v1')  # 可指向通义/智谱
-OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
-SUMMARY_AUTO = False       # 转写完成后是否自动总结（默认关）
+LLM_PROVIDER    = os.environ.get('LLM_PROVIDER', 'deepseek')   # 预设表里的 key
+LLM_PROVIDERS   = _load_providers('llm_providers.json')         # 读预设表
+SUMMARY_AUTO    = False       # 转写完成后是否自动总结（默认关）
+
+def current_llm_provider():
+    """解析当前 provider：预设 + 对应环境变量的 api_key。"""
+    p = LLM_PROVIDERS[LLM_PROVIDER]
+    key = os.environ.get(p['api_key_env']) or _LOCAL_ENV.get(p['api_key_env'])
+    return {**p, 'api_key': key or 'ollama'}   # Ollama 无需 key
 ```
+
+**切换厂商**：`.env` 改 `LLM_PROVIDER=glm` + 配 `GLM_API_KEY`，重启即可，**零代码改动**。
+**加新厂商**：在 `llm_providers.json` 加一行预设 + 配对应 key 环境变量。
+**默认 DeepSeek**：国内直连、便宜（约 ¥1/百万 token）、中文强、JSON 模式稳。
 
 ## 8. 前置条件
 
-### 8.1 本地 Ollama（默认）
+### 8.1 云端 API key（默认路径）
+
+选定一家，在 `.env` 配 `LLM_PROVIDER` + 对应 key（预设表 `api_key_env` 指定的变量名）：
+
+```bash
+# .env
+LLM_PROVIDER=deepseek
+DEEPSEEK_API_KEY=sk-xxx
+```
+
+> 国内服务器部署：DeepSeek / GLM / 通义 均国内直连，无需代理。OpenAI 需代理或把 `base_url` 指向中转。
+
+### 8.2 本地 Ollama（可选，零出域备选）
 
 ```bash
 brew install ollama && ollama serve
-ollama pull qwen2.5:7b     # 中文好、~4.7GB；显存够可上 qwen2.5:14b
+ollama pull qwen2.5:7b
+# .env: LLM_PROVIDER=ollama
 ```
 
-### 8.2 云端 API（可选）
-
-`.env` 配 `OPENAI_API_KEY`，或把 `OPENAI_BASE_URL` 指向通义/智谱的兼容端点。**注意告知用户：开启云端 provider 会把逐字稿文本发送到外部服务。**
+> **隐私提示**：云端 provider 会把逐字稿文本发送到外部服务，UI 切换时明确告知；需要全程不出域时用 Ollama。
 
 ## 9. 前端交互
 
@@ -191,12 +226,11 @@ ollama pull qwen2.5:7b     # 中文好、~4.7GB；显存够可上 qwen2.5:14b
 
 | 风险 | 应对 |
 |------|------|
-| Ollama 未运行 / 模型未拉 | 按钮前置检测，不可用时置灰 + 提示安装，不影响转写/搜索/导出 |
-| 云端 API key 缺失 / 失败 | 同上降级；记录 `error_message`，可重试 |
+| provider 不可用（key 缺失 / 欠费 / 限流 / 超时） | 按钮前置检测可用性，不可用置灰 + 提示；失败记 `error_message` 可重试；不影响转写/搜索/导出 |
 | 超长会议超时 | map-reduce 分段 + 单段超时重试 |
-| 输出非合法 JSON | 容错解析（提取首个 `{...}`、修复尾逗号、正则兜底）；仍失败则记 `error_message` |
-| 隐私（云端出域） | 默认本地；切云端时 UI 明确提示 |
-| 成本（云端计费） | `SUMMARY_AUTO` 默认关，手动触发为主 |
+| 输出非合法 JSON / 各家稳定性不一 | 优先 `response_format: json_object`；不支持则强约束 prompt + 容错解析（提取 `{...}`、修复尾逗号、正则兜底） |
+| 隐私（逐字稿出域） | UI 切云端 provider 时明确提示；本地 Ollama 为零出域备选 |
+| 成本（云端计费） | `SUMMARY_AUTO` 默认关，手动触发为主；UI 可显示所用 provider/模型 |
 
 ## 11. 对现有功能的影响
 
@@ -212,8 +246,8 @@ ollama pull qwen2.5:7b     # 中文好、~4.7GB；显存够可上 qwen2.5:14b
 ### 12.1 P10a — 本地总结 + 详情页展示
 
 1. `models.py` 新增 `Summary` 表；
-2. 新建 `summarizer.py`（拼接 / map-reduce / provider 抽象 / Ollama 实现 / 容错解析）；
-3. `config.py` 加总结配置项；
+2. 新建 `summarizer.py`（拼接 / map-reduce / 统一 OpenAI 兼容客户端 / 容错解析）；
+3. `config.py` 加总结配置 + `llm_providers.json` 多厂商预设表 + `current_llm_provider()`；
 4. `worker.py` 新增 `('summarize', id)` 任务 + `enqueue_summarize()`；
 5. `app.py` 加 `POST /file/<id>/summarize`（入队）+ `GET /api/file/<id>/summary`（取结果）；
 6. `detail.html` 总结面板（摘要 / 待办 / 关键词）+ 生成按钮 + 状态轮询。
@@ -231,11 +265,11 @@ ollama pull qwen2.5:7b     # 中文好、~4.7GB；显存够可上 qwen2.5:14b
 - 关键词 chips 点击 → 联动详情页全文搜索（复用 P6）；
 - 导出 Markdown 在标题下追加「总结区块」。
 
-### 12.3 P10c（可选）— 云端 API + 自动 + 流式
+### 12.3 P10c（可选）— 自动 + 流式 + provider 管理页
 
-- 接 OpenAI / 通义 / 智谱兼容 API（`provider='openai'`）；
 - `SUMMARY_AUTO` 转写完成自动总结；
-- SSE 流式输出，边生成边显示。
+- SSE 流式输出，边生成边显示；
+- 设置页可视化编辑 `llm_providers.json`（增删厂商）、切换默认 provider。
 
 ---
 
